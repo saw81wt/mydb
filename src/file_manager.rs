@@ -60,8 +60,8 @@ impl Page {
         Ok(())
     }
 
-    pub fn max_length(num: i32) -> i32 {
-        300
+    pub fn max_length(strlen: usize) -> usize {
+        INTGER_BYTES + strlen
     }
 }
 
@@ -108,13 +108,13 @@ mod tests {
         page1.set_string(pos1, "abcdefg".to_string()).unwrap();
         assert_eq!(page1.get_string(pos1).unwrap(), "abcdefg".to_string());
 
-        let size1: usize = INTGER_BYTES + "abcdefg".len();
+        let size1: usize = Page::max_length("abcdefg".len());
 
         let pos2 = (pos1 + size1) as usize;
         page1.set_int(pos2, 345).unwrap();
         assert_eq!(page1.get_int(pos2).unwrap(), 345);
 
-        let pos3 = pos2 + INTGER_BYTES;
+        let pos3 = Page::max_length(pos2);
         page1.set_bytes(pos3, b"hijklmn").unwrap();
         assert_eq!(page1.get_bytes(pos3).unwrap().to_vec(), b"hijklmn");        
         //file_manager.write(&block_id, &page1);

@@ -63,6 +63,10 @@ impl Page {
     pub fn max_length(strlen: usize) -> usize {
         INTGER_BYTES + strlen
     }
+    
+    pub fn contents(&mut self) -> &mut Vec<u8> {
+        self.cursor.get_mut()
+    }
 }
 
 pub struct FileManager {

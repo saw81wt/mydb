@@ -110,14 +110,14 @@ mod tests {
 
     #[test]
     fn disk() {
-        let file_manager = FileManager::new("simple_db".to_string());
+        let file_manager1 = FileManager::new("data".to_string());
 
         let block_id = BlockId {
             filename: "testfile".to_string(),
             block_number: 2
         };
 
-        let mut page1 = Page::new(file_manager.block_size);
+        let mut page1 = Page::new(file_manager1.block_size);
 
         let pos1: usize = 1025;
         page1.set_string(pos1, "abcdefg".to_string()).unwrap();
@@ -131,15 +131,17 @@ mod tests {
 
         let pos3 = Page::max_length(pos2);
         page1.set_bytes(pos3, b"hijklmn").unwrap();
-        assert_eq!(page1.get_bytes(pos3).unwrap().to_vec(), b"hijklmn");        
-        //file_manager.write(&block_id, &page1);
+        assert_eq!(page1.get_bytes(pos3).unwrap().to_vec(), b"hijklmn");
 
-        //let mut page2 = Page::new(file_manager.block_size);
-        //file_manager.read(&block_id, &page2);
+        file_manager1.write(&block_id, &mut page1).unwrap();
 
-        //assert_eq!(page1.get_string(pos1), page2.get_string(pos1));
-        //assert_eq!(page1.get_int(pos2), page2.get_int(pos2));
+        let file_manager2 = FileManager::new("data".to_string());
 
-        //assert_ne!(page1.get_string(pos1), page2.get_string(pos2))
+        let mut page2 = Page::new(file_manager2.block_size);
+
+        file_manager2.read(&block_id, &mut page2).unwrap();
+
+        assert_eq!(page2.get_string(pos1).unwrap(), "abcdefg".to_string());
+        
     }
 }

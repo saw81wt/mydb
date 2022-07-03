@@ -1,4 +1,5 @@
 use std::io::{Cursor, SeekFrom, Seek, Read, Write, self};
+use std::fs::{File, OpenOptions};
 
 pub const PAGE_SIZE: usize = 4096;
 pub const INTGER_BYTES: usize = 4;
@@ -78,19 +79,29 @@ impl FileManager {
     fn new(directory: String) -> Self {
         FileManager {
             directory,
-            block_size: 1024,
+            block_size: PAGE_SIZE,
         }
     }
 
-    fn write(&self, block_id: &BlockId, page: &Page) {
-
+    fn write(&self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+        let mut file = self.get_file(&block_id.filename)?;
+        file.write_all(page.contents())?;
+        Ok(())
     }
 
-    fn read(&self, block_id: &BlockId, page: &Page) {
-
+    fn read(&self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+        let mut file = self.get_file(&block_id.filename)?;
+        file.read_to_end(page.contents())?;
+        Ok(())
     }
 
-    fn get_file(&self, filename: String) {}
+    fn get_file(&self, filename: &String) -> io::Result<File> {
+        OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create(true)
+            .open(format!("{}/{filename}", self.directory))
+    }
 }
 
 #[cfg(test)]

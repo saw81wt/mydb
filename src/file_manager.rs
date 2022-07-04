@@ -107,11 +107,20 @@ impl FileManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::Builder;
 
     #[test]
     fn disk() {
-        let directory = "data";
-        let filename = "testfile";
+        let directory = "./data";
+        let tempfile = Builder::new()
+            .tempfile_in(directory)
+            .unwrap();
+        let filename = tempfile
+            .path()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
 
         let str_sample = "abcdeg";
         let byte_sample = b"hijklmn";
@@ -149,5 +158,7 @@ mod tests {
         file_manager1.write(&block_id, &mut page1).unwrap();
         file_manager2.read(&block_id, &mut page2).unwrap();
         assert_eq!(page2.get_string(str_position).unwrap(), str_sample.to_string());
+
+        drop(tempfile)
     }
 }

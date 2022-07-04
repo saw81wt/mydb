@@ -110,38 +110,44 @@ mod tests {
 
     #[test]
     fn disk() {
-        let file_manager1 = FileManager::new("data".to_string());
+        let directory = "data";
+        let filename = "testfile";
 
+        let str_sample = "abcdeg";
+        let byte_sample = b"hijklmn";
+        let int_sample = 345;
+
+
+        let file_manager1 = FileManager::new(directory.to_string());
+        let file_manager2 = FileManager::new(directory.to_string());
+        
         let block_id = BlockId {
-            filename: "testfile".to_string(),
+            filename: filename.to_string(),
             block_number: 2
         };
 
         let mut page1 = Page::new(file_manager1.block_size);
-
-        let pos1: usize = 1025;
-        page1.set_string(pos1, "abcdefg".to_string()).unwrap();
-        assert_eq!(page1.get_string(pos1).unwrap(), "abcdefg".to_string());
-
-        let size1: usize = Page::max_length("abcdefg".len());
-
-        let pos2 = (pos1 + size1) as usize;
-        page1.set_int(pos2, 345).unwrap();
-        assert_eq!(page1.get_int(pos2).unwrap(), 345);
-
-        let pos3 = Page::max_length(pos2);
-        page1.set_bytes(pos3, b"hijklmn").unwrap();
-        assert_eq!(page1.get_bytes(pos3).unwrap().to_vec(), b"hijklmn");
-
-        file_manager1.write(&block_id, &mut page1).unwrap();
-
-        let file_manager2 = FileManager::new("data".to_string());
-
         let mut page2 = Page::new(file_manager2.block_size);
 
-        file_manager2.read(&block_id, &mut page2).unwrap();
+        let str_position: usize = 1025;
+        let byte_position = str_position + Page::max_length(str_sample.len());
+        let int_position = Page::max_length(byte_position + byte_sample.len());
+    
+        // set_string & get_string
+        page1.set_string(str_position, str_sample.to_string()).unwrap();
+        assert_eq!(page1.get_string(str_position).unwrap(), str_sample.to_string());
 
-        assert_eq!(page2.get_string(pos1).unwrap(), "abcdefg".to_string());
-        
+        // set_bytes & get_bytes
+        page1.set_bytes(byte_position, byte_sample).unwrap();
+        assert_eq!(page1.get_bytes(byte_position).unwrap().to_vec(), byte_sample);
+
+        // set_int & get_int
+        page1.set_int(int_position, int_sample).unwrap();
+        assert_eq!(page1.get_int(int_position).unwrap(), int_sample);
+
+        // write file & read file
+        file_manager1.write(&block_id, &mut page1).unwrap();
+        file_manager2.read(&block_id, &mut page2).unwrap();
+        assert_eq!(page2.get_string(str_position).unwrap(), str_sample.to_string());
     }
 }

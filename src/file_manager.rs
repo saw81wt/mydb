@@ -135,8 +135,14 @@ mod tests {
             block_number: 2
         };
 
+        let block_id2 = BlockId {
+            filename: filename.to_string(),
+            block_number: 3
+        };
+
         let mut page1 = Page::new(file_manager1.block_size);
         let mut page2 = Page::new(file_manager2.block_size);
+        let mut page3 = Page::new(file_manager2.block_size);
 
         let str_position: usize = 1025;
         let byte_position = str_position + Page::max_length(str_sample.len());
@@ -158,7 +164,10 @@ mod tests {
         file_manager1.write(&block_id, &mut page1).unwrap();
         file_manager2.read(&block_id, &mut page2).unwrap();
         assert_eq!(page2.get_string(str_position).unwrap(), str_sample.to_string());
-
+        
+        file_manager2.read(&block_id2, &mut page3).unwrap();
+        assert!(page3.get_string(str_position).is_err());
+        
         drop(tempfile)
     }
 }

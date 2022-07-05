@@ -1,5 +1,5 @@
-use std::io::{Cursor, SeekFrom, Seek, Read, Write, self};
 use std::fs::{File, OpenOptions};
+use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
 pub const PAGE_SIZE: usize = 4096;
 pub const INTGER_BYTES: usize = 4;
@@ -12,14 +12,14 @@ pub struct BlockId {
 
 pub struct Page {
     pub block_size: usize,
-    cursor: Cursor<Vec<u8>>
+    cursor: Cursor<Vec<u8>>,
 }
 
 impl Page {
     pub fn new(block_size: usize) -> Self {
         Page {
             block_size,
-            cursor: Cursor::new(Vec::with_capacity(block_size))
+            cursor: Cursor::new(Vec::with_capacity(block_size)),
         }
     }
 
@@ -44,13 +44,13 @@ impl Page {
         Ok(data)
     }
 
-    pub fn set_bytes(&mut self, offset: usize, value: &[u8]) -> io::Result<()>{
+    pub fn set_bytes(&mut self, offset: usize, value: &[u8]) -> io::Result<()> {
         self.cursor.seek(SeekFrom::Start(offset as u64))?;
         self.set_int(offset, value.len() as i32)?;
         self.cursor.write_all(value)?;
         Ok(())
     }
-    
+
     pub fn get_string(&mut self, offset: usize) -> io::Result<String> {
         let data = self.get_bytes(offset)?;
         Ok(String::from_utf8(data.to_vec()).unwrap())
@@ -64,7 +64,7 @@ impl Page {
     pub fn max_length(strlen: usize) -> usize {
         INTGER_BYTES + strlen
     }
-    
+
     pub fn contents(&mut self) -> &mut Vec<u8> {
         self.cursor.get_mut()
     }
@@ -114,32 +114,24 @@ mod tests {
     #[test]
     fn disk() {
         let directory = "./data";
-        let tempfile = Builder::new()
-            .tempfile_in(directory)
-            .unwrap();
-        let filename = tempfile
-            .path()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap();
+        let tempfile = Builder::new().tempfile_in(directory).unwrap();
+        let filename = tempfile.path().file_name().unwrap().to_str().unwrap();
 
         let str_sample = "abcdeg";
         let byte_sample = b"hijklmn";
         let int_sample = 345;
 
-
         let file_manager1 = FileManager::new(directory.to_string());
         let file_manager2 = FileManager::new(directory.to_string());
-        
+
         let block_id = BlockId {
             filename: filename.to_string(),
-            block_number: 2
+            block_number: 2,
         };
 
         let block_id2 = BlockId {
             filename: filename.to_string(),
-            block_number: 3
+            block_number: 3,
         };
 
         let mut page1 = Page::new(file_manager1.block_size);
@@ -149,14 +141,22 @@ mod tests {
         let str_position: usize = 1025;
         let byte_position = str_position + Page::max_length(str_sample.len());
         let int_position = Page::max_length(byte_position + byte_sample.len());
-    
+
         // set_string & get_string
-        page1.set_string(str_position, str_sample.to_string()).unwrap();
-        assert_eq!(page1.get_string(str_position).unwrap(), str_sample.to_string());
+        page1
+            .set_string(str_position, str_sample.to_string())
+            .unwrap();
+        assert_eq!(
+            page1.get_string(str_position).unwrap(),
+            str_sample.to_string()
+        );
 
         // set_bytes & get_bytes
         page1.set_bytes(byte_position, byte_sample).unwrap();
-        assert_eq!(page1.get_bytes(byte_position).unwrap().to_vec(), byte_sample);
+        assert_eq!(
+            page1.get_bytes(byte_position).unwrap().to_vec(),
+            byte_sample
+        );
 
         // set_int & get_int
         page1.set_int(int_position, int_sample).unwrap();
@@ -165,11 +165,14 @@ mod tests {
         // write file & read file
         file_manager1.write(&block_id, &mut page1).unwrap();
         file_manager2.read(&block_id, &mut page2).unwrap();
-        assert_eq!(page2.get_string(str_position).unwrap(), str_sample.to_string());
-        
+        assert_eq!(
+            page2.get_string(str_position).unwrap(),
+            str_sample.to_string()
+        );
+
         file_manager2.read(&block_id2, &mut page3).unwrap();
         assert!(page3.get_string(str_position).is_err());
-        
+
         drop(tempfile)
     }
 }

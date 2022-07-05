@@ -7,7 +7,7 @@ pub const INTGER_BYTES: usize = 4;
 #[derive(Eq, PartialEq, Hash)]
 pub struct BlockId {
     pub filename: String,
-    pub block_number: i32,
+    pub block_number: usize,
 }
 
 pub struct Page {
@@ -85,12 +85,14 @@ impl FileManager {
 
     fn write(&self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
         let mut file = self.get_file(&block_id.filename)?;
+        file.seek(SeekFrom::Start((block_id.block_number * PAGE_SIZE) as u64))?;
         file.write_all(page.contents())?;
         Ok(())
     }
 
     fn read(&self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
         let mut file = self.get_file(&block_id.filename)?;
+        file.seek(SeekFrom::Start((block_id.block_number * PAGE_SIZE) as u64))?;
         file.read_to_end(page.contents())?;
         Ok(())
     }

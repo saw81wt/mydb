@@ -1,5 +1,9 @@
+use std::collections::HashMap;
+
+use std::collections::hash_map::Entry;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+use std::rc::Rc;
 
 pub const PAGE_SIZE: usize = 4096;
 pub const INTGER_BYTES: usize = 4;
@@ -73,6 +77,7 @@ impl Page {
 pub struct FileManager {
     pub directory: String,
     pub block_size: usize,
+    pub open_files: HashMap<String, File>,
 }
 
 impl FileManager {
@@ -80,30 +85,39 @@ impl FileManager {
         FileManager {
             directory,
             block_size: PAGE_SIZE,
+            open_files: HashMap::new(),
         }
     }
 
-    fn write(&self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+    fn write(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
         let mut file = self.get_file(&block_id.filename)?;
         file.seek(SeekFrom::Start((block_id.block_number * PAGE_SIZE) as u64))?;
         file.write_all(page.contents())?;
         Ok(())
     }
 
-    fn read(&self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+    fn read(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
         let mut file = self.get_file(&block_id.filename)?;
         file.seek(SeekFrom::Start((block_id.block_number * PAGE_SIZE) as u64))?;
         file.read_to_end(page.contents())?;
         Ok(())
     }
 
-    fn get_file(&self, filename: &String) -> io::Result<File> {
-        OpenOptions::new()
-            .write(true)
-            .read(true)
-            .create(true)
-            .open(format!("{}/{filename}", self.directory))
+    fn get_file(&mut self, filename: &String) -> io::Result<&File> {
+        let file = match self.open_files.entry(filename.to_string()) {
+            Entry::Occupied(o) => o.into_mut(),
+            Entry::Vacant(v) => {
+                let new_file = OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .create(true)
+                    .open(format!("{}/{filename}", self.directory))?;
+                v.insert(new_file)
+            }
+        };
+        Ok(file)
     }
+    
 }
 
 #[cfg(test)]
@@ -121,8 +135,8 @@ mod tests {
         let byte_sample = b"hijklmn";
         let int_sample = 345;
 
-        let file_manager1 = FileManager::new(directory.to_string());
-        let file_manager2 = FileManager::new(directory.to_string());
+        let mut file_manager1 = FileManager::new(directory.to_string());
+        let mut file_manager2 = FileManager::new(directory.to_string());
 
         let block_id = BlockId {
             filename: filename.to_string(),

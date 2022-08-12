@@ -14,14 +14,12 @@ pub struct BlockId {
 }
 
 pub struct Page {
-    pub block_size: usize,
     cursor: Cursor<Vec<u8>>,
 }
 
 impl Page {
     pub fn new(block_size: usize) -> Self {
         Page {
-            block_size,
             cursor: Cursor::new(Vec::with_capacity(block_size)),
         }
     }
@@ -70,6 +68,14 @@ impl Page {
 
     pub fn contents(&mut self) -> &mut Vec<u8> {
         self.cursor.get_mut()
+    }
+}
+
+impl From<Box<[u8]>> for Page {
+    fn from(buf: Box<[u8]>) -> Self {
+        Page {
+            cursor: Cursor::new(buf.to_vec()),
+        }
     }
 }
 

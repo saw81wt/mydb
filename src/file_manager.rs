@@ -129,7 +129,7 @@ impl FileManager {
 
     pub fn append(&mut self, filename: &String) -> io::Result<BlockId> {
         let new_block_num = self.length(filename)?;
-        let block = BlockId {
+        let new_block = BlockId {
             filename: filename.to_string(),
             block_number: new_block_num,
         };
@@ -139,7 +139,7 @@ impl FileManager {
         let mut file = self.get_file(filename)?;
         file.seek(SeekFrom::Start((new_block_num * block_size) as u64))?;
         file.write_all(&buf)?;
-        Ok(block)
+        Ok(new_block)
     }
 
     pub fn length(&mut self, filename: &String) -> io::Result<usize> {

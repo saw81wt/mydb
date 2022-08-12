@@ -49,10 +49,11 @@ impl LogManager {
         LogIterator::new(self.file_manager.clone(), self.current_block.clone())
     }
 
-    fn append(&mut self, log_rec: &[u8]) -> io::Result<i32> {
-        let mut boundary = self.log_page.get_int(0).expect("get_int");
-        let rec_size = log_rec.len();
-        let bytes_needed = rec_size + INTGER_BYTES;
+    fn append(&mut self, log_record: &[u8]) -> io::Result<i32> {
+        //
+        let mut boundary = self.get_boundary();
+        let record_size = log_record.len();
+        let bytes_needed = record_size + INTGER_BYTES;
 
         if boundary as usize - bytes_needed < INTGER_BYTES {
             self.flush()?;
@@ -60,12 +61,27 @@ impl LogManager {
             boundary = self.log_page.get_int(0).expect("get_int");
         }
 
-        let rec_pos = boundary as usize - bytes_needed;
-        self.log_page.set_bytes(rec_pos, log_rec).expect("set_byte");
-        self.log_page.set_int(0, rec_pos as i32).expect("set_int");
+        let record_pos = boundary as usize - bytes_needed;
+        self.log_page
+            .set_bytes(record_pos, log_record)
+            .expect("set_byte");
+        self.log_page
+            .set_int(0, record_pos as i32)
+            .expect("set_int");
 
         self.last_saved_log_sequence_number += 1;
         Ok(self.latest_log_sequence_number)
+    }
+
+    // log pageの最初(offset = 0)には境界のサイズが格納されている
+    fn get_boundary(&mut self) -> i32 {
+        self.log_page.get_int(0).expect("get boundary")
+    }
+
+    fn set_boundary(&mut self) {
+        self.log_page
+            .set_int(0, self.file_manager.borrow().block_size as i32)
+            .expect("set boundary")
     }
 
     fn append_new_block(&mut self) -> io::Result<BlockId> {
@@ -74,9 +90,7 @@ impl LogManager {
             .borrow_mut()
             .append(&self.log_file)
             .expect("append");
-        self.log_page
-            .set_int(0, self.file_manager.borrow_mut().block_size as i32)
-            .expect("set_int");
+        self.set_boundary();
         self.file_manager
             .borrow_mut()
             .write(&block_id, &mut self.log_page)

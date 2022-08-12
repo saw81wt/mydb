@@ -1,13 +1,15 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use std::collections::hash_map::Entry;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+use std::rc::Rc;
 
 pub const PAGE_SIZE: usize = 4096;
 pub const INTGER_BYTES: usize = 4;
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Clone)]
 pub struct BlockId {
     pub filename: String,
     pub block_number: usize,
@@ -82,45 +84,67 @@ impl From<Box<[u8]>> for Page {
 pub struct FileManager {
     pub directory: String,
     pub block_size: usize,
-    pub open_files: HashMap<String, File>,
+    pub open_files: Rc<RefCell<HashMap<String, File>>>,
 }
 
 impl FileManager {
-    fn new(directory: String) -> Self {
+    pub fn new(directory: String) -> Self {
         FileManager {
             directory,
             block_size: PAGE_SIZE,
-            open_files: HashMap::new(),
+            open_files: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
-    fn write(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+    pub fn write(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+        let block_size = self.block_size;
         let mut file = self.get_file(&block_id.filename)?;
-        file.seek(SeekFrom::Start((block_id.block_number * PAGE_SIZE) as u64))?;
+        file.seek(SeekFrom::Start((block_id.block_number * block_size) as u64))?;
         file.write_all(page.contents())?;
         Ok(())
     }
 
-    fn read(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+    pub fn read(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
+        let block_size = self.block_size;
         let mut file = self.get_file(&block_id.filename)?;
-        file.seek(SeekFrom::Start((block_id.block_number * PAGE_SIZE) as u64))?;
+        file.seek(SeekFrom::Start((block_id.block_number * block_size) as u64))?;
         file.read_to_end(page.contents())?;
         Ok(())
     }
 
-    fn get_file(&mut self, filename: &String) -> io::Result<&File> {
-        let file = match self.open_files.entry(filename.to_string()) {
-            Entry::Occupied(o) => o.into_mut(),
+    fn get_file(&mut self, filename: &String) -> io::Result<File> {
+        let file = match self.open_files.borrow_mut().entry(filename.to_string()) {
+            Entry::Occupied(o) => o.into_mut().try_clone()?,
             Entry::Vacant(v) => {
                 let new_file = OpenOptions::new()
                     .write(true)
                     .read(true)
                     .create(true)
                     .open(format!("{}/{filename}", self.directory))?;
-                v.insert(new_file)
+                v.insert(new_file).try_clone()?
             }
         };
         Ok(file)
+    }
+
+    pub fn append(&mut self, filename: &String) -> io::Result<BlockId> {
+        let new_block_num = self.length(filename)?;
+        let block = BlockId {
+            filename: filename.to_string(),
+            block_number: new_block_num,
+        };
+        let buf: Vec<u8> = Vec::with_capacity(self.block_size);
+
+        let block_size = self.block_size;
+        let mut file = self.get_file(filename)?;
+        file.seek(SeekFrom::Start((new_block_num * block_size) as u64))?;
+        file.write_all(&buf)?;
+        Ok(block)
+    }
+
+    pub fn length(&mut self, filename: &String) -> io::Result<usize> {
+        let file = self.get_file(filename)?;
+        Ok(file.metadata().unwrap().len() as usize / self.block_size)
     }
 }
 

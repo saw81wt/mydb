@@ -69,12 +69,18 @@ impl LogManager {
     }
 
     fn append_new_block(&mut self) -> io::Result<BlockId> {
-        let block_id = self.file_manager.borrow_mut().append(&self.log_file).expect("append");
+        let block_id = self
+            .file_manager
+            .borrow_mut()
+            .append(&self.log_file)
+            .expect("append");
         self.log_page
-            .set_int(0, self.file_manager.borrow_mut().block_size as i32).expect("set_int");
+            .set_int(0, self.file_manager.borrow_mut().block_size as i32)
+            .expect("set_int");
         self.file_manager
             .borrow_mut()
-            .write(&block_id, &mut self.log_page).expect("write");
+            .write(&block_id, &mut self.log_page)
+            .expect("write");
         Ok(block_id)
     }
 
@@ -105,13 +111,15 @@ impl LogIterator {
             current_pos: 0,
             boundary: 0,
         };
-        
+
         log_itertor.move_to_block(&block_id).unwrap();
         log_itertor
     }
 
     fn move_to_block(&mut self, block_id: &BlockId) -> io::Result<()> {
-        self.file_manager.borrow_mut().read(block_id, &mut self.page)?;
+        self.file_manager
+            .borrow_mut()
+            .read(block_id, &mut self.page)?;
         self.boundary = self.page.get_int(0)? as usize;
         self.current_pos = self.boundary;
         Ok(())
@@ -122,8 +130,10 @@ impl Iterator for LogIterator {
     type Item = Box<[u8]>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_pos >= self.file_manager.borrow().block_size && self.block_id.block_number <= 0 {
-            return None
+        if self.current_pos >= self.file_manager.borrow().block_size
+            && self.block_id.block_number <= 0
+        {
+            return None;
         }
 
         if self.current_pos == self.file_manager.borrow().block_size {

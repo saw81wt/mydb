@@ -6,7 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::rc::Rc;
 
-pub const PAGE_SIZE: usize = 100;
+pub const PAGE_SIZE: usize = 4096;
 pub const INTGER_BYTES: usize = 4;
 
 #[derive(Eq, PartialEq, Hash, Clone)]

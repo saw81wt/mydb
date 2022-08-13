@@ -58,7 +58,7 @@ impl LogManager {
         if (boundary - bytes_needed as i32) < (INTGER_BYTES as i32) {
             self.flush()?;
             self.current_block = self.append_new_block()?;
-            boundary = self.log_page.get_int(0).expect("get_int");
+            boundary = self.get_boundary();
         }
 
         let record_pos = boundary as usize - bytes_needed;
@@ -70,21 +70,11 @@ impl LogManager {
             .expect("set_int");
 
         self.last_saved_log_sequence_number += 1;
-        Ok(self.latest_log_sequence_number)
-    }
-
-    // log pageの最初(offset = 0)には境界のサイズが格納されている
-    fn get_boundary(&mut self) -> i32 {
-        self.log_page.get_int(0).expect("get boundary")
-    }
-
-    fn set_boundary(&mut self) {
-        self.log_page
-            .set_int(0, self.file_manager.borrow().block_size as i32)
-            .expect("set boundary")
+        Ok(self.last_saved_log_sequence_number)
     }
 
     fn append_new_block(&mut self) -> io::Result<BlockId> {
+        self.log_page = Page::new(self.file_manager.borrow().block_size);
         let block_id = self
             .file_manager
             .borrow_mut()
@@ -96,6 +86,17 @@ impl LogManager {
             .write(&block_id, &mut self.log_page)
             .expect("write");
         Ok(block_id)
+    }
+
+    // log pageの最初(offset = 0)には境界のサイズが格納されている
+    fn get_boundary(&mut self) -> i32 {
+        self.log_page.get_int(0).expect("get boundary")
+    }
+
+    fn set_boundary(&mut self) {
+        self.log_page
+            .set_int(0, self.file_manager.borrow().block_size as i32)
+            .expect("set boundary")
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -131,6 +132,7 @@ impl LogIterator {
     }
 
     fn move_to_block(&mut self, block_id: &BlockId) -> io::Result<()> {
+        self.page = Page::new(self.file_manager.borrow().block_size);
         self.file_manager
             .borrow_mut()
             .read(block_id, &mut self.page)?;

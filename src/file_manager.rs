@@ -6,7 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::rc::Rc;
 
-pub const PAGE_SIZE: usize = 4096;
+pub const PAGE_SIZE: usize = 100;
 pub const INTGER_BYTES: usize = 4;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
@@ -127,22 +127,23 @@ impl FileManager {
         Ok(file)
     }
 
-    pub fn append(&mut self, filename: &String) -> io::Result<BlockId> {
-        let new_block_num = self.length(filename)?;
+    pub fn append_new_block(&mut self, filename: &String) -> io::Result<BlockId> {
+        let block_size = self.block_size;
+
+        let new_block_num = self.last_block_num(filename)?;
         let new_block = BlockId {
             filename: filename.to_string(),
             block_number: new_block_num,
         };
-        let buf: Vec<u8> = Vec::with_capacity(self.block_size);
+        let buf: Vec<u8> = Vec::with_capacity(block_size);
 
-        let block_size = self.block_size;
         let mut file = self.get_file(filename)?;
         file.seek(SeekFrom::Start((new_block_num * block_size) as u64))?;
         file.write_all(&buf)?;
         Ok(new_block)
     }
 
-    pub fn length(&mut self, filename: &String) -> io::Result<usize> {
+    pub fn last_block_num(&mut self, filename: &String) -> io::Result<usize> {
         let file = self.get_file(filename)?;
         Ok(file.metadata().unwrap().len() as usize / self.block_size)
     }

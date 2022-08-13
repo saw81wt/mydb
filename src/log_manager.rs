@@ -13,11 +13,11 @@ pub struct LogManager {
 
 impl LogManager {
     pub fn new(mut file_manager: FileManager, log_file: String) -> io::Result<Self> {
-        let log_size = file_manager.length(&log_file)?;
+        let log_size = file_manager.last_block_num(&log_file)?;
         let mut log_page = Page::new(file_manager.block_size);
 
         let current_block = if log_size == 0 {
-            let block_id = file_manager.append(&log_file)?;
+            let block_id = file_manager.append_new_block(&log_file)?;
             log_page.set_int(0, file_manager.block_size as i32)?;
             file_manager.write(&block_id, &mut log_page)?;
             block_id
@@ -55,7 +55,7 @@ impl LogManager {
         let record_size = log_record.len();
         let bytes_needed = record_size + INTGER_BYTES;
 
-        if boundary as usize - bytes_needed < INTGER_BYTES {
+        if (boundary - bytes_needed as i32) < (INTGER_BYTES as i32) {
             self.flush()?;
             self.current_block = self.append_new_block()?;
             boundary = self.log_page.get_int(0).expect("get_int");
@@ -88,7 +88,7 @@ impl LogManager {
         let block_id = self
             .file_manager
             .borrow_mut()
-            .append(&self.log_file)
+            .append_new_block(&self.log_file)
             .expect("append");
         self.set_boundary();
         self.file_manager
@@ -107,7 +107,7 @@ impl LogManager {
     }
 }
 
-struct LogIterator {
+pub struct LogIterator {
     file_manager: Rc<RefCell<FileManager>>,
     block_id: BlockId,
     page: Page,

@@ -44,12 +44,12 @@ impl LogManager {
         Ok(())
     }
 
-    fn iterator(&mut self) -> LogIterator {
+    fn iterator(&mut self) -> io::Result<LogIterator> {
         self.flush().unwrap();
         LogIterator::new(self.file_manager.clone(), self.current_block.clone())
     }
 
-    fn append(&mut self, log_record: &[u8]) -> io::Result<i32> {
+    fn append_record(&mut self, log_record: &[u8]) -> io::Result<i32> {
         //
         let mut boundary = self.get_boundary();
         let record_size = log_record.len();
@@ -63,11 +63,9 @@ impl LogManager {
 
         let record_pos = boundary as usize - bytes_needed;
         self.log_page
-            .set_bytes(record_pos, log_record)
-            .expect("set_byte");
+            .set_bytes(record_pos, log_record)?;
         self.log_page
-            .set_int(0, record_pos as i32)
-            .expect("set_int");
+            .set_int(0, record_pos as i32)?;
 
         self.last_saved_log_sequence_number += 1;
         Ok(self.last_saved_log_sequence_number)
@@ -78,13 +76,11 @@ impl LogManager {
         let block_id = self
             .file_manager
             .borrow_mut()
-            .append_new_block(&self.log_file)
-            .expect("append");
+            .append_new_block(&self.log_file)?;
         self.set_boundary();
         self.file_manager
             .borrow_mut()
-            .write(&block_id, &mut self.log_page)
-            .expect("write");
+            .write(&block_id, &mut self.log_page)?;
         Ok(block_id)
     }
 
@@ -117,7 +113,7 @@ pub struct LogIterator {
 }
 
 impl LogIterator {
-    pub fn new(file_manager: Rc<RefCell<FileManager>>, block_id: BlockId) -> Self {
+    pub fn new(file_manager: Rc<RefCell<FileManager>>, block_id: BlockId) -> io::Result<Self> {
         let buf: Vec<u8> = Vec::with_capacity(file_manager.borrow().block_size);
         let mut log_itertor = LogIterator {
             file_manager,
@@ -127,8 +123,8 @@ impl LogIterator {
             boundary: 0,
         };
 
-        log_itertor.move_to_block(&block_id).unwrap();
-        log_itertor
+        log_itertor.move_to_block(&block_id)?;
+        Ok(log_itertor)
     }
 
     fn move_to_block(&mut self, block_id: &BlockId) -> io::Result<()> {
@@ -181,10 +177,10 @@ mod tests {
 
         for n in 0..35 {
             let mut buf = create_log_record(format!("record{}", n).to_string(), n);
-            log_manager.append(buf.as_mut()).unwrap();
+            log_manager.append_record(buf.as_mut()).unwrap();
         }
 
-        for record in log_manager.iterator() {
+        for record in log_manager.iterator().unwrap() {
             let mut page = Page::from(record);
             let str = page.get_string(0).unwrap();
             let npos = Page::max_length(str.len());

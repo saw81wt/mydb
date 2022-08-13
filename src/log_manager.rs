@@ -13,11 +13,11 @@ pub struct LogManager {
 
 impl LogManager {
     pub fn new(mut file_manager: FileManager, log_file: String) -> io::Result<Self> {
-        let log_size = file_manager.length(&log_file)?;
+        let log_size = file_manager.last_block_num(&log_file)?;
         let mut log_page = Page::new(file_manager.block_size);
 
         let current_block = if log_size == 0 {
-            let block_id = file_manager.append(&log_file)?;
+            let block_id = file_manager.append_new_block(&log_file)?;
             log_page.set_int(0, file_manager.block_size as i32)?;
             file_manager.write(&block_id, &mut log_page)?;
             block_id
@@ -44,38 +44,55 @@ impl LogManager {
         Ok(())
     }
 
-    fn iterator(&mut self) -> LogIterator {
+    fn iterator(&mut self) -> io::Result<LogIterator> {
         self.flush().unwrap();
         LogIterator::new(self.file_manager.clone(), self.current_block.clone())
     }
 
-    fn append(&mut self, log_rec: &[u8]) -> io::Result<i32> {
-        let mut boundary = self.log_page.get_int(0).expect("get_int");
-        let rec_size = log_rec.len();
-        let bytes_needed = rec_size + INTGER_BYTES;
+    fn append_record(&mut self, log_record: &[u8]) -> io::Result<i32> {
+        //
+        let mut boundary = self.get_boundary();
+        let record_size = log_record.len();
+        let bytes_needed = record_size + INTGER_BYTES;
 
-        if boundary as usize - bytes_needed < INTGER_BYTES {
+        if (boundary - bytes_needed as i32) < (INTGER_BYTES as i32) {
             self.flush()?;
             self.current_block = self.append_new_block()?;
-            boundary = self.log_page.get_int(0).expect("get_int");
+            boundary = self.get_boundary();
         }
 
-        let rec_pos = boundary as usize - bytes_needed;
-        self.log_page.set_bytes(rec_pos, log_rec).expect("set_byte");
-        self.log_page.set_int(0, rec_pos as i32).expect("set_int");
+        let record_pos = boundary as usize - bytes_needed;
+        self.log_page
+            .set_bytes(record_pos, log_record)?;
+        self.log_page
+            .set_int(0, record_pos as i32)?;
 
         self.last_saved_log_sequence_number += 1;
-        Ok(self.latest_log_sequence_number)
+        Ok(self.last_saved_log_sequence_number)
     }
 
     fn append_new_block(&mut self) -> io::Result<BlockId> {
-        let block_id = self.file_manager.borrow_mut().append(&self.log_file).expect("append");
-        self.log_page
-            .set_int(0, self.file_manager.borrow_mut().block_size as i32).expect("set_int");
+        self.log_page = Page::new(self.file_manager.borrow().block_size);
+        let block_id = self
+            .file_manager
+            .borrow_mut()
+            .append_new_block(&self.log_file)?;
+        self.set_boundary();
         self.file_manager
             .borrow_mut()
-            .write(&block_id, &mut self.log_page).expect("write");
+            .write(&block_id, &mut self.log_page)?;
         Ok(block_id)
+    }
+
+    // log pageの最初(offset = 0)には境界のサイズが格納されている
+    fn get_boundary(&mut self) -> i32 {
+        self.log_page.get_int(0).expect("get boundary")
+    }
+
+    fn set_boundary(&mut self) {
+        self.log_page
+            .set_int(0, self.file_manager.borrow().block_size as i32)
+            .expect("set boundary")
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -87,7 +104,7 @@ impl LogManager {
     }
 }
 
-struct LogIterator {
+pub struct LogIterator {
     file_manager: Rc<RefCell<FileManager>>,
     block_id: BlockId,
     page: Page,
@@ -96,7 +113,7 @@ struct LogIterator {
 }
 
 impl LogIterator {
-    pub fn new(file_manager: Rc<RefCell<FileManager>>, block_id: BlockId) -> Self {
+    pub fn new(file_manager: Rc<RefCell<FileManager>>, block_id: BlockId) -> io::Result<Self> {
         let buf: Vec<u8> = Vec::with_capacity(file_manager.borrow().block_size);
         let mut log_itertor = LogIterator {
             file_manager,
@@ -105,13 +122,16 @@ impl LogIterator {
             current_pos: 0,
             boundary: 0,
         };
-        
-        log_itertor.move_to_block(&block_id).unwrap();
-        log_itertor
+
+        log_itertor.move_to_block(&block_id)?;
+        Ok(log_itertor)
     }
 
     fn move_to_block(&mut self, block_id: &BlockId) -> io::Result<()> {
-        self.file_manager.borrow_mut().read(block_id, &mut self.page)?;
+        self.page = Page::new(self.file_manager.borrow().block_size);
+        self.file_manager
+            .borrow_mut()
+            .read(block_id, &mut self.page)?;
         self.boundary = self.page.get_int(0)? as usize;
         self.current_pos = self.boundary;
         Ok(())
@@ -122,8 +142,10 @@ impl Iterator for LogIterator {
     type Item = Box<[u8]>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_pos >= self.file_manager.borrow().block_size && self.block_id.block_number <= 0 {
-            return None
+        if self.current_pos >= self.file_manager.borrow().block_size
+            && self.block_id.block_number <= 0
+        {
+            return None;
         }
 
         if self.current_pos == self.file_manager.borrow().block_size {
@@ -155,10 +177,10 @@ mod tests {
 
         for n in 0..35 {
             let mut buf = create_log_record(format!("record{}", n).to_string(), n);
-            log_manager.append(buf.as_mut()).expect("here");
+            log_manager.append_record(buf.as_mut()).unwrap();
         }
 
-        for record in log_manager.iterator() {
+        for record in log_manager.iterator().unwrap() {
             let mut page = Page::from(record);
             let str = page.get_string(0).unwrap();
             let npos = Page::max_length(str.len());

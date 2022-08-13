@@ -179,7 +179,7 @@ mod tests {
 
         for n in 0..35 {
             let mut buf = create_log_record(format!("record{}", n).to_string(), n);
-            log_manager.append(buf.as_mut()).expect("here");
+            log_manager.append(buf.as_mut()).unwrap();
         }
 
         for record in log_manager.iterator() {

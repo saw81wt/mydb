@@ -62,10 +62,8 @@ impl LogManager {
         }
 
         let record_pos = boundary as usize - bytes_needed;
-        self.log_page
-            .set_bytes(record_pos, log_record)?;
-        self.log_page
-            .set_int(0, record_pos as i32)?;
+        self.log_page.set_bytes(record_pos, log_record)?;
+        self.log_page.set_int(0, record_pos as i32)?;
 
         self.last_saved_log_sequence_number += 1;
         Ok(self.last_saved_log_sequence_number)

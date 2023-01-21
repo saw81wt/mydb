@@ -1,4 +1,7 @@
-use std::{sync::{Arc, Mutex}, io};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+};
 
 use crate::file_manager::{BlockId, FileManager, Page, INTGER_BYTES};
 

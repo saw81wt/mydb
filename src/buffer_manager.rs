@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex, RwLock};
 use std::{cell::RefCell, rc::Rc};
 use thiserror::Error;
 
@@ -15,8 +16,6 @@ pub enum BufferAbortError {
 }
 
 pub struct Buffer {
-    file_manager: Rc<RefCell<FileManager>>,
-    log_manager: Rc<RefCell<LogManager>>,
     contents: Page,
     block_id: Option<BlockId>,
     pins: i32,
@@ -25,11 +24,9 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    fn new(file_manager: Rc<RefCell<FileManager>>, log_manager: Rc<RefCell<LogManager>>) -> Buffer {
-        let contents = Page::new(file_manager.borrow().block_size);
+    fn new(file_manager: Arc<Mutex<FileManager>>) -> Buffer {
+        let contents = Page::new(file_manager.lock().unwrap().block_size);
         Buffer {
-            file_manager,
-            log_manager,
             contents,
             block_id: None,
             pins: 0,
@@ -64,26 +61,10 @@ impl Buffer {
     fn assign_to_back(&mut self, block_id: BlockId) {
         self.flush();
         self.block_id = Some(block_id);
-        self.file_manager
-            .borrow_mut()
-            .read(&self.block_id.as_ref().unwrap(), &mut self.contents)
-            .unwrap();
         self.pins = 0;
     }
 
-    fn flush(&mut self) {
-        if self.txnum >= 0 {
-            self.log_manager
-                .borrow_mut()
-                .flush_with(self.last_save_numbder)
-                .unwrap();
-            self.file_manager
-                .borrow_mut()
-                .write(&self.block_id.as_ref().unwrap(), &mut self.contents)
-                .unwrap();
-            self.txnum -= 1;
-        }
-    }
+    fn flush(&mut self) {}
 
     fn pin(&mut self) {
         self.pins += 1;
@@ -95,25 +76,26 @@ impl Buffer {
 }
 
 pub struct BufferManager {
-    buffer_pool: Vec<Rc<RefCell<Buffer>>>,
+    file_manager: Arc<Mutex<FileManager>>,
+    log_manager: Arc<Mutex<LogManager>>,
+    buffer_pool: Mutex<Vec<Arc<RwLock<Buffer>>>>,
     num_available: i32,
 }
 
 impl BufferManager {
     pub fn new(
-        file_manager: Rc<RefCell<FileManager>>,
-        log_manager: Rc<RefCell<LogManager>>,
+        file_manager: Arc<Mutex<FileManager>>,
+        log_manager: Arc<Mutex<LogManager>>,
         num_buffers: i32,
     ) -> BufferManager {
         BufferManager {
-            buffer_pool: (0..num_buffers)
-                .map(|_| {
-                    Rc::new(RefCell::new(Buffer::new(
-                        file_manager.clone(),
-                        log_manager.clone(),
-                    )))
-                })
-                .collect(),
+            file_manager: Arc::clone(&file_manager),
+            log_manager: Arc::clone(&log_manager),
+            buffer_pool: Mutex::new(
+                (0..num_buffers)
+                    .map(|_| Arc::new(RwLock::new(Buffer::new(file_manager.clone()))))
+                    .collect(),
+            ),
             num_available: num_buffers,
         }
     }
@@ -123,56 +105,75 @@ impl BufferManager {
     }
 
     pub fn flush_all(&mut self, txnum: i32) {
-        for buffer in self.buffer_pool.iter() {
-            let mut buffer = buffer.borrow_mut();
+        let locked_pool = self.buffer_pool.lock().unwrap();
+        for buffer in locked_pool.iter() {
+            let mut buffer = buffer.write().unwrap();
             if buffer.modifying_tx() == txnum {
-                buffer.flush()
+                if buffer.txnum >= 0 {
+                    self.log_manager
+                        .lock()
+                        .unwrap()
+                        .flush_with(buffer.last_save_numbder)
+                        .unwrap();
+                    self.file_manager
+                        .lock()
+                        .unwrap()
+                        .write(&buffer.block_id.clone().unwrap(), &mut buffer.contents)
+                        .unwrap();
+                    buffer.txnum -= 1;
+                }
             }
         }
     }
 
-    pub fn unpin(&mut self, buffer: Rc<RefCell<Buffer>>) {
-        buffer.borrow_mut().unpin();
-        if !buffer.borrow().is_pinned() {
+    pub fn unpin(&mut self, buffer: Arc<RwLock<Buffer>>) {
+        buffer.write().unwrap().unpin();
+        if !buffer.write().unwrap().is_pinned() {
             self.num_available += 1;
         }
     }
 
-    pub fn pin(&mut self, block_id: &BlockId) -> Result<Rc<RefCell<Buffer>>, BufferAbortError> {
+    pub fn pin(&mut self, block_id: &BlockId) -> Result<Arc<RwLock<Buffer>>, BufferAbortError> {
         self.try_to_pin(block_id)
             .ok_or(BufferAbortError::BufferAbortError)
     }
 
     // TODO: fn wait_to_long(self) {}
 
-    fn try_to_pin(&mut self, block_id: &BlockId) -> Option<Rc<RefCell<Buffer>>> {
+    fn try_to_pin(&mut self, block_id: &BlockId) -> Option<Arc<RwLock<Buffer>>> {
         if let Some(buffer) = self.find_assignable_block(block_id) {
-            if !buffer.borrow().is_pinned() {
+            if !buffer.write().unwrap().is_pinned() {
                 self.num_available -= 1;
             }
-            buffer.borrow_mut().pin();
+            buffer.write().unwrap().pin();
             Some(buffer)
         } else {
             None
         }
     }
 
-    fn find_assignable_block(&self, block_id: &BlockId) -> Option<Rc<RefCell<Buffer>>> {
+    fn find_assignable_block(&self, block_id: &BlockId) -> Option<Arc<RwLock<Buffer>>> {
         self.find_existing_buffer(block_id)
             .or_else(|| match self.choose_unpinned_buffer() {
                 Some(buffer) => {
-                    buffer.borrow_mut().assign_to_back(block_id.clone());
+                    buffer.write().unwrap().assign_to_back(block_id.clone());
+                    self.file_manager
+                        .lock()
+                        .unwrap()
+                        .read(&block_id, &mut buffer.write().unwrap().contents)
+                        .unwrap();
                     Some(buffer)
                 }
                 None => None,
             })
     }
 
-    fn find_existing_buffer(&self, target_block_id: &BlockId) -> Option<Rc<RefCell<Buffer>>> {
-        self.buffer_pool
+    fn find_existing_buffer(&self, target_block_id: &BlockId) -> Option<Arc<RwLock<Buffer>>> {
+        let locked_pool = self.buffer_pool.lock().unwrap();
+        locked_pool
             .iter()
             .find(|buffer| {
-                if let Some(block_id) = &buffer.borrow().block_id {
+                if let Some(block_id) = buffer.write().unwrap().block_id.clone() {
                     block_id.eq(target_block_id)
                 } else {
                     false
@@ -181,10 +182,12 @@ impl BufferManager {
             .and_then(|v| Some(v.clone()))
     }
 
-    fn choose_unpinned_buffer(&self) -> Option<Rc<RefCell<Buffer>>> {
+    fn choose_unpinned_buffer(&self) -> Option<Arc<RwLock<Buffer>>> {
         self.buffer_pool
+            .lock()
+            .unwrap()
             .iter()
-            .find(|buffer| !buffer.borrow().is_pinned())
+            .find(|buffer| !buffer.write().unwrap().is_pinned())
             .and_then(|v| Some(v.clone()))
     }
 }
@@ -200,17 +203,18 @@ mod tests {
         let log_tempfile = Builder::new().tempfile_in(directory.to_string()).unwrap();
         let log_filename = log_tempfile.path().file_name().unwrap().to_str().unwrap();
         let log_file_manager = FileManager::new(directory.to_string());
-        let log_manager = Rc::new(RefCell::new(
+        let log_manager = Arc::new(Mutex::new(
             LogManager::new(log_file_manager, log_filename.to_string()).unwrap(),
         ));
 
         let tempfile = Builder::new().tempfile_in(directory.to_string()).unwrap();
         let filename = tempfile.path().file_name().unwrap().to_str().unwrap();
-        let file_manager = Rc::new(RefCell::new(FileManager::new(directory.to_string())));
+        let file_manager = Arc::new(Mutex::new(FileManager::new(directory.to_string())));
 
-        let mut buffer_manager = BufferManager::new(file_manager.clone(), log_manager.clone(), 3);
+        let mut buffer_manager =
+            BufferManager::new(Arc::clone(&file_manager), Arc::clone(&log_manager), 3);
 
-        let mut buffer: Vec<Rc<RefCell<Buffer>>> = Vec::with_capacity(6);
+        let mut buffer: Vec<Arc<RwLock<Buffer>>> = Vec::with_capacity(6);
         let block_id_0 = BlockId {
             filename: filename.to_string(),
             block_number: 0,

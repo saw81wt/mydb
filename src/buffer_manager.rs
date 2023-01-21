@@ -24,8 +24,8 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    fn new(file_manager: Arc<Mutex<FileManager>>) -> Buffer {
-        let contents = Page::new(file_manager.lock().unwrap().block_size);
+    fn new(block_size: usize) -> Buffer {
+        let contents = Page::new(block_size);
         Buffer {
             contents,
             block_id: None,
@@ -88,12 +88,13 @@ impl BufferManager {
         log_manager: Arc<Mutex<LogManager>>,
         num_buffers: i32,
     ) -> BufferManager {
+        let block_size = file_manager.lock().unwrap().block_size;
         BufferManager {
             file_manager: Arc::clone(&file_manager),
             log_manager: Arc::clone(&log_manager),
             buffer_pool: Mutex::new(
                 (0..num_buffers)
-                    .map(|_| Arc::new(RwLock::new(Buffer::new(file_manager.clone()))))
+                    .map(|_| Arc::new(RwLock::new(Buffer::new(block_size))))
                     .collect(),
             ),
             num_available: num_buffers,

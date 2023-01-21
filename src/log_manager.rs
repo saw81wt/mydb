@@ -1,9 +1,9 @@
-use std::{cell::RefCell, io, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use crate::file_manager::{BlockId, FileManager, Page, INTGER_BYTES};
 
 pub struct LogManager {
-    file_manager: Rc<RefCell<FileManager>>,
+    file_manager: Arc<Mutex<FileManager>>,
     log_file: String,
     log_page: Page,
     current_block: BlockId,
@@ -28,7 +28,7 @@ impl LogManager {
             }
         };
         Ok(LogManager {
-            file_manager: Rc::new(RefCell::new(file_manager)),
+            file_manager: Arc::new(Mutex::new(file_manager)),
             log_file,
             log_page,
             current_block,
@@ -70,14 +70,16 @@ impl LogManager {
     }
 
     fn append_new_block(&mut self) -> io::Result<BlockId> {
-        self.log_page = Page::new(self.file_manager.borrow().block_size);
+        self.log_page = Page::new(self.file_manager.lock().unwrap().block_size);
         let block_id = self
             .file_manager
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .append_new_block(&self.log_file)?;
         self.set_boundary();
         self.file_manager
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .write(&block_id, &mut self.log_page)?;
         Ok(block_id)
     }
@@ -89,13 +91,14 @@ impl LogManager {
 
     fn set_boundary(&mut self) {
         self.log_page
-            .set_int(0, self.file_manager.borrow().block_size as i32)
+            .set_int(0, self.file_manager.lock().unwrap().block_size as i32)
             .expect("set boundary")
     }
 
     fn flush(&mut self) -> io::Result<()> {
         self.file_manager
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .write(&mut self.current_block, &mut self.log_page)?;
         self.last_saved_log_sequence_number = self.latest_log_sequence_number;
         Ok(())
@@ -103,7 +106,7 @@ impl LogManager {
 }
 
 pub struct LogIterator {
-    file_manager: Rc<RefCell<FileManager>>,
+    file_manager: Arc<Mutex<FileManager>>,
     block_id: BlockId,
     page: Page,
     current_pos: usize,
@@ -111,8 +114,8 @@ pub struct LogIterator {
 }
 
 impl LogIterator {
-    pub fn new(file_manager: Rc<RefCell<FileManager>>, block_id: BlockId) -> io::Result<Self> {
-        let buf: Vec<u8> = Vec::with_capacity(file_manager.borrow().block_size);
+    pub fn new(file_manager: Arc<Mutex<FileManager>>, block_id: BlockId) -> io::Result<Self> {
+        let buf: Vec<u8> = Vec::with_capacity(file_manager.lock().unwrap().block_size);
         let mut log_itertor = LogIterator {
             file_manager,
             block_id: block_id.clone(),
@@ -126,9 +129,10 @@ impl LogIterator {
     }
 
     fn move_to_block(&mut self, block_id: &BlockId) -> io::Result<()> {
-        self.page = Page::new(self.file_manager.borrow().block_size);
+        self.page = Page::new(self.file_manager.lock().unwrap().block_size);
         self.file_manager
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .read(block_id, &mut self.page)?;
         self.boundary = self.page.get_int(0)? as usize;
         self.current_pos = self.boundary;
@@ -140,13 +144,13 @@ impl Iterator for LogIterator {
     type Item = Box<[u8]>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_pos >= self.file_manager.borrow().block_size
+        if self.current_pos >= self.file_manager.lock().unwrap().block_size
             && self.block_id.block_number <= 0
         {
             return None;
         }
 
-        if self.current_pos == self.file_manager.borrow().block_size {
+        if self.current_pos == self.file_manager.lock().unwrap().block_size {
             let block_id = BlockId {
                 filename: self.block_id.filename.clone(),
                 block_number: self.block_id.block_number - 1,

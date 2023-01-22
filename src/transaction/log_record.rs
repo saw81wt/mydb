@@ -19,6 +19,7 @@ impl From<i32> for LogRecordType {
     fn from(v: i32) -> Self {
         match v {
             0 => LogRecordType::CheckPoint,
+            1 => LogRecordType::Start,
             2 => LogRecordType::Commit,
             5 => LogRecordType::SetString,
             _ => todo!(),
@@ -30,7 +31,8 @@ impl From<LogRecordType> for i32 {
     fn from(l: LogRecordType) -> Self {
         match l {
             LogRecordType::CheckPoint => 0,
-            LogRecordType::Commit => 3,
+            LogRecordType::Start => 1,
+            LogRecordType::Commit => 2,
             LogRecordType::SetString => 5,
             _ => 0,
         }
@@ -39,7 +41,7 @@ impl From<LogRecordType> for i32 {
 
 pub enum LogRecord {
     CheckPoint(TransactionRecord),
-    Start,
+    Start(TransactionRecord),
     Commit(TransactionRecord),
     Rollback,
     SetInt,
@@ -50,6 +52,13 @@ impl LogRecord {
     pub fn create_checkpoint_record(txnum: i32) -> Self {
         LogRecord::CheckPoint(TransactionRecord {
             record_type: LogRecordType::CheckPoint,
+            txnum,
+        })
+    }
+
+    pub fn create_start_record(txnum: i32) -> Self {
+        LogRecord::Start(TransactionRecord {
+            record_type: LogRecordType::Start,
             txnum,
         })
     }
@@ -100,6 +109,12 @@ impl From<&mut Page> for LogRecord {
 
                 LogRecord::create_checkpoint_record(txnum)
             }
+            LogRecordType::Start => {
+                let tpos = INTGER_BYTES;
+                let txnum = page.get_int(tpos).unwrap();
+
+                LogRecord::create_start_record(txnum)
+            }
             LogRecordType::Commit => {
                 let tpos = INTGER_BYTES;
                 let txnum = page.get_int(tpos).unwrap();
@@ -142,7 +157,7 @@ impl From<&mut Page> for LogRecord {
 impl LogRecord {
     pub fn write_to_log(&self, log_manager: Arc<Mutex<LogManager>>) -> i32 {
         match self {
-            Self::CheckPoint(record) | Self::Commit(record) => {
+            Self::CheckPoint(record) | Self::Commit(record) | Self::Start(record) => {
                 let tpos = INTGER_BYTES;
                 let record_len = tpos + INTGER_BYTES;
 

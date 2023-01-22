@@ -5,8 +5,10 @@ use crate::{
     log_manager::LogManager,
 };
 
-#[derive(Debug, Clone, Copy)]
-enum LogRecordType {
+use super::transaction::Transaction;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogRecordType {
     CheckPoint = 0,
     Start,
     Commit,
@@ -38,7 +40,6 @@ impl From<LogRecordType> for i32 {
             LogRecordType::Rollback => 3,
             LogRecordType::SetInt => 4,
             LogRecordType::SetString => 5,
-            _ => 0,
         }
     }
 }
@@ -105,6 +106,23 @@ impl LogRecord {
             block_id,
         })
     }
+}
+
+impl LogRecordTrait for LogRecord {
+    fn get_txnum(&self) -> i32 {
+        match self {
+            Self::CheckPoint(record)
+            | Self::Commit(record)
+            | Self::Start(record)
+            | Self::Rollback(record) => record.txnum,
+            Self::SetInt(record) => record.txnum,
+            Self::SetString(record) => record.txnum,
+        }
+    }
+}
+
+pub trait LogRecordTrait {
+    fn get_txnum(&self) -> i32;
 }
 
 pub struct TransactionRecord {
@@ -274,6 +292,23 @@ impl LogRecord {
                     .unwrap()
             }
             _ => 0,
+        }
+    }
+
+    pub fn undo(&self, transaction: &Transaction) {
+        match self {
+            Self::CheckPoint(record)
+            | Self::Commit(record)
+            | Self::Start(record)
+            | Self::Rollback(record) => {
+                todo!()
+            }
+            Self::SetInt(record) => {
+                todo!()
+            }
+            Self::SetString(_) => {
+                todo!()
+            }
         }
     }
 }

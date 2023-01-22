@@ -23,7 +23,9 @@ impl Transaction {
         }
     }
 
-    fn pin(&self) {}
+    pub fn pin(&self, blcok_id: &BlockId) {
+        todo!()
+    }
 }
 
 #[cfg(test)]

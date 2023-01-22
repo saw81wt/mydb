@@ -47,7 +47,7 @@ impl LogManager {
         Ok(())
     }
 
-    fn iterator(&mut self) -> io::Result<LogIterator> {
+    pub fn iterator(&mut self) -> io::Result<LogIterator> {
         self.flush().unwrap();
         LogIterator::new(self.file_manager.clone(), self.current_block.clone())
     }

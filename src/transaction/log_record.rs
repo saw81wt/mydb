@@ -22,6 +22,7 @@ impl From<i32> for LogRecordType {
             1 => LogRecordType::Start,
             2 => LogRecordType::Commit,
             3 => LogRecordType::Rollback,
+            4 => LogRecordType::SetInt,
             5 => LogRecordType::SetString,
             _ => todo!(),
         }
@@ -35,6 +36,7 @@ impl From<LogRecordType> for i32 {
             LogRecordType::Start => 1,
             LogRecordType::Commit => 2,
             LogRecordType::Rollback => 3,
+            LogRecordType::SetInt => 4,
             LogRecordType::SetString => 5,
             _ => 0,
         }
@@ -46,8 +48,8 @@ pub enum LogRecord {
     Start(TransactionRecord),
     Commit(TransactionRecord),
     Rollback(TransactionRecord),
-    SetInt,
-    SetString(SetStringRecord),
+    SetInt(UpdateRecord<i32>),
+    SetString(UpdateRecord<String>),
 }
 
 impl LogRecord {
@@ -79,13 +81,23 @@ impl LogRecord {
         })
     }
 
+    pub fn create_set_int_record(txnum: i32, offset: i32, value: i32, block_id: BlockId) -> Self {
+        LogRecord::SetInt(UpdateRecord {
+            record_type: LogRecordType::SetInt,
+            txnum,
+            offset,
+            value,
+            block_id,
+        })
+    }
+
     pub fn create_set_string_record(
         txnum: i32,
         offset: i32,
         value: String,
         block_id: BlockId,
     ) -> Self {
-        LogRecord::SetString(SetStringRecord {
+        LogRecord::SetString(UpdateRecord {
             record_type: LogRecordType::SetString,
             txnum,
             offset,
@@ -100,11 +112,11 @@ struct TransactionRecord {
     txnum: i32,
 }
 
-struct SetStringRecord {
+struct UpdateRecord<T> {
     record_type: LogRecordType,
     txnum: i32,
     offset: i32,
-    value: String,
+    value: T,
     block_id: BlockId,
 }
 
@@ -135,6 +147,32 @@ impl From<&mut Page> for LogRecord {
                 let txnum = page.get_int(tpos).unwrap();
 
                 LogRecord::create_rollback_record(txnum)
+            }
+            LogRecordType::SetInt => {
+                let tpos = INTGER_BYTES;
+                let txnum = page.get_int(tpos).unwrap();
+
+                let fpos = tpos + INTGER_BYTES;
+                let filename = page.get_string(fpos).unwrap();
+
+                let bpos = fpos + Page::max_length(filename.len());
+                let block_number = page.get_int(bpos).unwrap();
+
+                let opos = bpos + INTGER_BYTES;
+                let offset = page.get_int(opos).unwrap();
+
+                let vpos = opos + INTGER_BYTES;
+                let value = page.get_int(vpos).unwrap();
+
+                LogRecord::create_set_int_record(
+                    txnum,
+                    offset,
+                    value,
+                    BlockId {
+                        filename,
+                        block_number: block_number as usize,
+                    },
+                )
             }
             LogRecordType::SetString => {
                 let tpos = INTGER_BYTES;
@@ -185,6 +223,28 @@ impl LogRecord {
                 page.set_int(0, record.record_type.into()).unwrap();
                 page.set_int(tpos, record.txnum).unwrap();
 
+                log_manager
+                    .lock()
+                    .unwrap()
+                    .append_record(&page.contents())
+                    .unwrap()
+            }
+            Self::SetInt(record) => {
+                let tpos = INTGER_BYTES;
+                let fpos = tpos + INTGER_BYTES;
+                let bpos = fpos + Page::max_length(record.block_id.filename.len());
+                let opos = bpos + INTGER_BYTES;
+                let vpos = opos + INTGER_BYTES;
+                let reclen = vpos + INTGER_BYTES;
+
+                let buf = Vec::with_capacity(reclen);
+                let mut page = Page::from(Box::from(buf));
+                page.set_int(0, LogRecordType::SetString.into()).unwrap();
+                page.set_int(tpos, record.txnum).unwrap();
+                page.set_string(fpos, record.block_id.filename.to_owned())
+                    .unwrap();
+                page.set_int(bpos, record.offset).unwrap();
+                page.set_int(vpos, record.value).unwrap();
                 log_manager
                     .lock()
                     .unwrap()

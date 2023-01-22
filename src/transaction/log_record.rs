@@ -51,6 +51,21 @@ impl LogRecord {
             txnum,
         })
     }
+
+    pub fn create_set_string_record(
+        txnum: i32,
+        offset: i32,
+        value: String,
+        block_id: BlockId,
+    ) -> Self {
+        LogRecord::SetString(SetStringRecord {
+            record_type: LogRecordType::SetString,
+            txnum,
+            offset,
+            value,
+            block_id,
+        })
+    }
 }
 
 struct SetStringRecord {
@@ -92,16 +107,15 @@ impl From<&mut Page> for LogRecord {
                 let vpos = opos + INTGER_BYTES;
                 let value = page.get_string(vpos).unwrap();
 
-                LogRecord::SetString(SetStringRecord {
-                    record_type: LogRecordType::SetString,
+                LogRecord::create_set_string_record(
                     txnum,
                     offset,
                     value,
-                    block_id: BlockId {
+                    BlockId {
                         filename,
                         block_number: block_number as usize,
                     },
-                })
+                )
             }
             _ => {
                 todo!()

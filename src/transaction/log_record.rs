@@ -107,12 +107,12 @@ impl LogRecord {
     }
 }
 
-struct TransactionRecord {
+pub struct TransactionRecord {
     record_type: LogRecordType,
     txnum: i32,
 }
 
-struct UpdateRecord<T> {
+pub struct UpdateRecord<T> {
     record_type: LogRecordType,
     txnum: i32,
     offset: i32,

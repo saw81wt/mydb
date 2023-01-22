@@ -1,6 +1,13 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    borrow::BorrowMut,
+    sync::{Arc, Mutex, RwLock},
+};
 
-use crate::{buffer_manager::BufferManager, log_manager::LogManager};
+use crate::{
+    buffer_manager::{Buffer, BufferManager},
+    file_manager::{BlockId, Page},
+    log_manager::LogManager,
+};
 
 use super::{log_record::LogRecord, transaction::Transaction};
 
@@ -12,12 +19,14 @@ struct RecoveryManager {
 }
 
 impl RecoveryManager {
-    fn new(
+    pub fn new(
         log_manager: Arc<Mutex<LogManager>>,
         buffer_manager: Arc<Mutex<BufferManager>>,
         transaction: Transaction,
         txnum: i32,
     ) -> Self {
+        let record = LogRecord::create_start_record(txnum);
+        record.write_to_log(Arc::clone(&log_manager));
         Self {
             log_manager,
             buffer_manager,
@@ -26,10 +35,44 @@ impl RecoveryManager {
         }
     }
 
-    fn commit(&self) {
+    pub fn commit(&self) {
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_commit_record(self.txnum);
         let lsm = record.write_to_log(Arc::clone(&self.log_manager));
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
+    }
+
+    pub fn rollback(&self) {
+        // Todo: recover
+        self.buffer_manager.lock().unwrap().flush_all(self.txnum);
+        let record = LogRecord::create_rollback_record(self.txnum);
+        let lsm = record.write_to_log(Arc::clone(&self.log_manager));
+        self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
+    }
+
+    pub fn recover(&self) {
+        // todo: recover
+        self.buffer_manager.lock().unwrap().flush_all(self.txnum);
+        let record = LogRecord::create_checkpoint_record(self.txnum);
+        let lsm = record.write_to_log(Arc::clone(&self.log_manager));
+        self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
+    }
+
+    pub fn set_int(&self, buf: Arc<RwLock<Buffer>>, offset: i32) -> i32 {
+        let mut locked_buffer = buf.write().unwrap();
+        let old_value = locked_buffer.get_int(offset as usize).unwrap();
+        let block_id = (*locked_buffer.block_id()).as_ref().unwrap();
+        let record =
+            LogRecord::create_set_int_record(self.txnum, offset, old_value, block_id.clone());
+        record.write_to_log(Arc::clone(&self.log_manager))
+    }
+
+    pub fn set_string(&self, buf: Arc<RwLock<Buffer>>, offset: i32) -> i32 {
+        let mut locked_buffer = buf.write().unwrap();
+        let old_value = locked_buffer.get_string(offset as usize).unwrap();
+        let block_id = (*locked_buffer.block_id()).as_ref().unwrap();
+        let record =
+            LogRecord::create_set_string_record(self.txnum, offset, old_value, block_id.clone());
+        record.write_to_log(Arc::clone(&self.log_manager))
     }
 }

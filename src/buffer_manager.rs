@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::{Arc, Mutex, RwLock},
+};
 use thiserror::Error;
 
 use crate::{
@@ -20,6 +23,19 @@ pub struct Buffer {
     pins: i32,
     txnum: i32,
     last_save_numbder: i32,
+}
+
+impl Deref for Buffer {
+    type Target = Page;
+    fn deref(&self) -> &Self::Target {
+        &self.contents
+    }
+}
+
+impl DerefMut for Buffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.contents
+    }
 }
 
 impl Buffer {

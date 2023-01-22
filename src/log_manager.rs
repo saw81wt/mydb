@@ -52,7 +52,7 @@ impl LogManager {
         LogIterator::new(self.file_manager.clone(), self.current_block.clone())
     }
 
-    fn append_record(&mut self, log_record: &[u8]) -> io::Result<i32> {
+    pub fn append_record(&mut self, log_record: &[u8]) -> io::Result<i32> {
         //
         let mut boundary = self.get_boundary();
         let record_size = log_record.len();

@@ -21,6 +21,7 @@ impl From<i32> for LogRecordType {
             0 => LogRecordType::CheckPoint,
             1 => LogRecordType::Start,
             2 => LogRecordType::Commit,
+            3 => LogRecordType::Rollback,
             5 => LogRecordType::SetString,
             _ => todo!(),
         }
@@ -33,6 +34,7 @@ impl From<LogRecordType> for i32 {
             LogRecordType::CheckPoint => 0,
             LogRecordType::Start => 1,
             LogRecordType::Commit => 2,
+            LogRecordType::Rollback => 3,
             LogRecordType::SetString => 5,
             _ => 0,
         }
@@ -43,7 +45,7 @@ pub enum LogRecord {
     CheckPoint(TransactionRecord),
     Start(TransactionRecord),
     Commit(TransactionRecord),
-    Rollback,
+    Rollback(TransactionRecord),
     SetInt,
     SetString(SetStringRecord),
 }
@@ -66,6 +68,13 @@ impl LogRecord {
     pub fn create_commit_record(txnum: i32) -> Self {
         LogRecord::Commit(TransactionRecord {
             record_type: LogRecordType::Commit,
+            txnum,
+        })
+    }
+
+    pub fn create_rollback_record(txnum: i32) -> Self {
+        LogRecord::Rollback(TransactionRecord {
+            record_type: LogRecordType::Rollback,
             txnum,
         })
     }
@@ -121,6 +130,12 @@ impl From<&mut Page> for LogRecord {
 
                 LogRecord::create_commit_record(txnum)
             }
+            LogRecordType::Rollback => {
+                let tpos = INTGER_BYTES;
+                let txnum = page.get_int(tpos).unwrap();
+
+                LogRecord::create_rollback_record(txnum)
+            }
             LogRecordType::SetString => {
                 let tpos = INTGER_BYTES;
                 let txnum = page.get_int(tpos).unwrap();
@@ -157,7 +172,10 @@ impl From<&mut Page> for LogRecord {
 impl LogRecord {
     pub fn write_to_log(&self, log_manager: Arc<Mutex<LogManager>>) -> i32 {
         match self {
-            Self::CheckPoint(record) | Self::Commit(record) | Self::Start(record) => {
+            Self::CheckPoint(record)
+            | Self::Commit(record)
+            | Self::Start(record)
+            | Self::Rollback(record) => {
                 let tpos = INTGER_BYTES;
                 let record_len = tpos + INTGER_BYTES;
 

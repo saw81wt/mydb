@@ -8,13 +8,13 @@ use crate::{
 
 use super::{
     log_record::{LogRecord, LogRecordTrait},
-    transaction::Transaction,
+    transaction::{self, Transaction},
 };
 
 struct RecoveryManager {
     log_manager: Arc<Mutex<LogManager>>,
     buffer_manager: Arc<Mutex<BufferManager>>,
-    transaction: Transaction,
+    //transaction: Transaction,
     txnum: i32,
 }
 
@@ -22,7 +22,7 @@ impl RecoveryManager {
     pub fn new(
         log_manager: Arc<Mutex<LogManager>>,
         buffer_manager: Arc<Mutex<BufferManager>>,
-        transaction: Transaction,
+        //transaction: Transaction,
         txnum: i32,
     ) -> Self {
         let record = LogRecord::create_start_record(txnum);
@@ -30,7 +30,7 @@ impl RecoveryManager {
         Self {
             log_manager,
             buffer_manager,
-            transaction,
+            //transaction,
             txnum,
         }
     }
@@ -42,16 +42,16 @@ impl RecoveryManager {
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
-    pub fn rollback(&self) {
-        self.do_rollback();
+    pub fn rollback(&self, transaction: &Transaction) {
+        self.do_rollback(transaction);
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_rollback_record(self.txnum);
         let lsm = record.write_to_log(Arc::clone(&self.log_manager));
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
-    pub fn recover(&self) {
-        self.do_recevery();
+    pub fn recover(&self, transaction: &Transaction) {
+        self.do_recevery(transaction);
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_checkpoint_record(self.txnum);
         let lsm = record.write_to_log(Arc::clone(&self.log_manager));
@@ -76,7 +76,7 @@ impl RecoveryManager {
         record.write_to_log(Arc::clone(&self.log_manager))
     }
 
-    fn do_rollback(&self) {
+    fn do_rollback(&self, transaction: &Transaction) {
         let iter = self.log_manager.lock().unwrap().iterator().unwrap();
         for record in iter {
             let mut page = Page::from(record);
@@ -85,14 +85,14 @@ impl RecoveryManager {
                 match log_record {
                     LogRecord::Start(_) => return,
                     _ => {
-                        log_record.undo(&self.transaction);
+                        log_record.undo(transaction);
                     }
                 }
             }
         }
     }
 
-    fn do_recevery(&self) {
+    fn do_recevery(&self, transaction: &Transaction) {
         let mut finished_transactions: Vec<i32> = vec![];
         let iter = self.log_manager.lock().unwrap().iterator().unwrap();
         for record in iter {
@@ -104,7 +104,7 @@ impl RecoveryManager {
                 LogRecord::Commit(_) | LogRecord::Rollback(_) => finished_transactions.push(txnum),
                 _ => {
                     if !finished_transactions.contains(&txnum) {
-                        log_record.undo(&self.transaction)
+                        log_record.undo(transaction)
                     }
                 }
             }

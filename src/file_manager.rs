@@ -9,7 +9,7 @@ use std::rc::Rc;
 pub const PAGE_SIZE: usize = 4096;
 pub const INTGER_BYTES: usize = 4;
 
-#[derive(Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct BlockId {
     pub filename: String,
     pub block_number: usize,

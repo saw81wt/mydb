@@ -113,7 +113,7 @@ impl ConcurrentManager {
     }
 
     fn has_lock(&self, block_id: &BlockId) -> bool {
-        let mut locked_table = self.table.lock().unwrap();
+        let locked_table = self.table.lock().unwrap();
         match locked_table.get(block_id) {
             Some(v) => v == "X",
             None => false,

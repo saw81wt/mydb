@@ -1,19 +1,20 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use crate::{error::LockAbortError, file_manager::BlockId};
 
 const MAX_TIME: Duration = Duration::from_secs(10);
 
-struct LockTable {
-    table: Arc<Mutex<HashMap<BlockId, i32>>>,
+
+pub struct LockTable {
+    table: RwLock<HashMap<BlockId, i32>>,
 }
 
 impl Default for LockTable {
     fn default() -> Self {
         Self {
-            table: Arc::new(Mutex::new(HashMap::new())),
+            table: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -33,7 +34,7 @@ impl LockTable {
 
         let val = self.get_lock_val(block_id);
 
-        let mut locked_table = self.table.lock().unwrap();
+        let mut locked_table = self.table.write().unwrap();
         locked_table.insert(block_id.clone(), val + 1);
         Ok(())
     }
@@ -46,14 +47,14 @@ impl LockTable {
             }
         }
 
-        let mut locked_table = self.table.lock().unwrap();
+        let mut locked_table = self.table.write().unwrap();
         locked_table.insert(block_id.clone(), -1);
         Ok(())
     }
 
     fn unlock(&mut self, block_id: &BlockId) {
         let ival = self.get_lock_val(block_id);
-        let mut locked_table = self.table.lock().unwrap();
+        let mut locked_table = self.table.write().unwrap();
         if ival > 1 {
             locked_table.insert(block_id.clone(), ival - 1);
         } else {
@@ -70,7 +71,7 @@ impl LockTable {
     }
 
     fn get_lock_val(&self, block_id: &BlockId) -> i32 {
-        let locked_table = self.table.lock().unwrap();
+        let locked_table = self.table.write().unwrap();
         match locked_table.get(block_id) {
             Some(v) => *v,
             None => 0,
@@ -78,13 +79,18 @@ impl LockTable {
     }
 }
 
-struct ConcurrentManager {
+pub struct ConcurrentManager {
     lock_table: LockTable,
     table: Arc<Mutex<HashMap<BlockId, String>>>,
 }
 
 impl ConcurrentManager {
-    fn slock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
+    pub fn new(lock_table: LockTable) -> Self {
+        let table = Arc::new(Mutex::new(HashMap::new()));
+        Self { lock_table, table }
+    }
+
+    pub fn slock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
         let mut locked_table = self.table.lock().unwrap();
         if locked_table.get(block_id) != None {
             self.lock_table.slock(block_id)?;
@@ -93,7 +99,7 @@ impl ConcurrentManager {
         Ok(())
     }
 
-    fn xlock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
+    pub fn xlock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
         if self.has_lock(block_id) {
             self.slock(block_id)?;
             self.lock_table.xlock(block_id)?;
@@ -104,7 +110,7 @@ impl ConcurrentManager {
         Ok(())
     }
 
-    fn release(&mut self) {
+    pub fn release(&mut self) {
         let mut locked_table = self.table.lock().unwrap();
         for block_id in locked_table.keys() {
             self.lock_table.unlock(block_id);

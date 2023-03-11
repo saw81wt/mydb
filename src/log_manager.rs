@@ -27,7 +27,7 @@ impl LogManager {
         } else {
             BlockId {
                 filename: log_file.clone(),
-                block_number: (log_size - 1) as usize,
+                block_number: (log_size - 1) as i32,
             }
         };
         Ok(LogManager {

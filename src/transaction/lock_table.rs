@@ -80,12 +80,12 @@ impl LockTable {
 }
 
 pub struct ConcurrentManager {
-    lock_table: LockTable,
+    lock_table: Arc<LockTable>,
     table: Arc<Mutex<HashMap<BlockId, String>>>,
 }
 
 impl ConcurrentManager {
-    pub fn new(lock_table: LockTable) -> Self {
+    pub fn new(lock_table: Arc<LockTable>) -> Self {
         let table = Arc::new(Mutex::new(HashMap::new()));
         Self { lock_table, table }
     }

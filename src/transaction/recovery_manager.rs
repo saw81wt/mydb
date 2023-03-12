@@ -27,7 +27,11 @@ impl RecoveryManager {
     ) -> Self {
         let record = LogRecord::create_start_record(txnum);
         let mut page: Page = record.into();
-        log_manager.lock().unwrap().append_record(page.contents()).unwrap();
+        log_manager
+            .lock()
+            .unwrap()
+            .append_record(page.contents())
+            .unwrap();
         Self {
             log_manager,
             buffer_manager,
@@ -40,7 +44,12 @@ impl RecoveryManager {
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_commit_record(self.txnum);
         let mut page: Page = record.into();
-        let lsm = self.log_manager.lock().unwrap().append_record(page.contents()).unwrap();
+        let lsm = self
+            .log_manager
+            .lock()
+            .unwrap()
+            .append_record(page.contents())
+            .unwrap();
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
@@ -49,7 +58,12 @@ impl RecoveryManager {
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_rollback_record(self.txnum);
         let mut page: Page = record.into();
-        let lsm = self.log_manager.lock().unwrap().append_record(page.contents()).unwrap();
+        let lsm = self
+            .log_manager
+            .lock()
+            .unwrap()
+            .append_record(page.contents())
+            .unwrap();
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
@@ -58,7 +72,12 @@ impl RecoveryManager {
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_checkpoint_record(self.txnum);
         let mut page: Page = record.into();
-        let lsm = self.log_manager.lock().unwrap().append_record(page.contents()).unwrap();
+        let lsm = self
+            .log_manager
+            .lock()
+            .unwrap()
+            .append_record(page.contents())
+            .unwrap();
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
@@ -69,7 +88,11 @@ impl RecoveryManager {
         let record =
             LogRecord::create_set_int_record(self.txnum, offset, old_value, block_id.clone());
         let mut page: Page = record.into();
-        self.log_manager.lock().unwrap().append_record(page.contents()).unwrap()
+        self.log_manager
+            .lock()
+            .unwrap()
+            .append_record(page.contents())
+            .unwrap()
     }
 
     pub fn set_string(&self, buf: Arc<RwLock<Buffer>>, offset: i32) -> i32 {
@@ -79,7 +102,11 @@ impl RecoveryManager {
         let record =
             LogRecord::create_set_string_record(self.txnum, offset, old_value, block_id.clone());
         let mut page: Page = record.into();
-        self.log_manager.lock().unwrap().append_record(page.contents()).unwrap()
+        self.log_manager
+            .lock()
+            .unwrap()
+            .append_record(page.contents())
+            .unwrap()
     }
 
     fn do_rollback(&self, transaction: &Transaction) {

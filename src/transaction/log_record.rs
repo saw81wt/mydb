@@ -314,7 +314,8 @@ mod tests {
             filename: "test.txt".to_string(),
             block_number: 1,
         };
-        let record = LogRecord::create_set_string_record(1, 0, "test".to_string(), block_id.clone());
+        let record =
+            LogRecord::create_set_string_record(1, 0, "test".to_string(), block_id.clone());
         let log_record = LogRecord::try_from(&mut record.into()).unwrap();
 
         match log_record {
@@ -328,4 +329,3 @@ mod tests {
         }
     }
 }
-

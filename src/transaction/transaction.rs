@@ -173,7 +173,11 @@ mod tests {
         let filename = tempfile.path().file_name().unwrap().to_str().unwrap();
         let file_manager = Arc::new(Mutex::new(FileManager::new(directory.to_string())));
 
-        let buffer_manager = Arc::new(Mutex::new(BufferManager::new(file_manager.clone(), log_manager.clone(), 3)));
+        let buffer_manager = Arc::new(Mutex::new(BufferManager::new(
+            file_manager.clone(),
+            log_manager.clone(),
+            3,
+        )));
 
         let lock_table = Arc::new(Mutex::new(LockTable::new()));
 

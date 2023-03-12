@@ -1,5 +1,6 @@
 use std::{
-    sync::{Arc, Mutex, RwLock}, ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut},
+    sync::{Arc, Mutex, RwLock},
 };
 use thiserror::Error;
 

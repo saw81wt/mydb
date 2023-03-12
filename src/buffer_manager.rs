@@ -50,8 +50,11 @@ impl Buffer {
         }
     }
 
-    pub fn block_id(&self) -> &Option<BlockId> {
-        &self.block_id
+    pub fn block_id(&self) -> Option<&BlockId> {
+        match &self.block_id {
+            Some(block_id) => Some(&block_id),
+            None => None,
+        }
     }
 
     pub fn set_modified(&mut self, txnum: i32, last_save_number: i32) {

@@ -15,6 +15,15 @@ pub struct BlockId {
     pub block_number: i32,
 }
 
+impl BlockId {
+    fn new(filename: &str, block_number: i32) -> Self {
+        BlockId {
+            filename: filename.to_string(),
+            block_number,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Page {
     cursor: Cursor<Vec<u8>>,

@@ -84,7 +84,10 @@ impl RecoveryManager {
     pub fn set_int(&self, buf: Arc<RwLock<Buffer>>, offset: i32) -> i32 {
         let mut locked_buffer = buf.write().unwrap();
         let old_value = locked_buffer.get_int(offset as usize).unwrap();
-        let block_id = (*locked_buffer.block_id()).as_ref().unwrap();
+        let block_id = match locked_buffer.block_id() {
+            Some(block_id) => block_id,
+            None => panic!("block id not assigned"),
+        };
         let record =
             LogRecord::create_set_int_record(self.txnum, offset, old_value, block_id.clone());
         let mut page: Page = record.into();
@@ -98,7 +101,7 @@ impl RecoveryManager {
     pub fn set_string(&self, buf: Arc<RwLock<Buffer>>, offset: i32) -> i32 {
         let mut locked_buffer = buf.write().unwrap();
         let old_value = locked_buffer.get_string(offset as usize).unwrap();
-        let block_id = (*locked_buffer.block_id()).as_ref().unwrap();
+        let block_id = locked_buffer.block_id().unwrap();
         let record =
             LogRecord::create_set_string_record(self.txnum, offset, old_value, block_id.clone());
         let mut page: Page = record.into();

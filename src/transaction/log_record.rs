@@ -138,85 +138,86 @@ pub struct UpdateRecord<T> {
     block_id: BlockId,
 }
 
-impl From<&mut Page> for LogRecord {
-    fn from(page: &mut Page) -> Self {
-        let record_type: LogRecordType = page.get_int(0).unwrap().into();
+impl TryFrom<&mut Page> for LogRecord {
+    type Error = anyhow::Error;
+    fn try_from(page: &mut Page) -> anyhow::Result<Self> {
+        let record_type: LogRecordType = page.get_int(0)?.into();
         match record_type {
             LogRecordType::CheckPoint => {
                 let tpos = INTGER_BYTES;
-                let txnum = page.get_int(tpos).unwrap();
+                let txnum = page.get_int(tpos)?;
 
-                LogRecord::create_checkpoint_record(txnum)
+                Ok(LogRecord::create_checkpoint_record(txnum))
             }
             LogRecordType::Start => {
                 let tpos = INTGER_BYTES;
-                let txnum = page.get_int(tpos).unwrap();
+                let txnum = page.get_int(tpos)?;
 
-                LogRecord::create_start_record(txnum)
+                Ok(LogRecord::create_start_record(txnum))
             }
             LogRecordType::Commit => {
                 let tpos = INTGER_BYTES;
-                let txnum = page.get_int(tpos).unwrap();
+                let txnum = page.get_int(tpos)?;
 
-                LogRecord::create_commit_record(txnum)
+                Ok(LogRecord::create_commit_record(txnum))
             }
             LogRecordType::Rollback => {
                 let tpos = INTGER_BYTES;
-                let txnum = page.get_int(tpos).unwrap();
+                let txnum = page.get_int(tpos)?;
 
-                LogRecord::create_rollback_record(txnum)
+                Ok(LogRecord::create_rollback_record(txnum))
             }
             LogRecordType::SetInt => {
                 let tpos = INTGER_BYTES;
-                let txnum = page.get_int(tpos).unwrap();
+                let txnum = page.get_int(tpos)?;
 
                 let fpos = tpos + INTGER_BYTES;
-                let filename = page.get_string(fpos).unwrap();
+                let filename = page.get_string(fpos)?;
 
                 let bpos = fpos + Page::max_length(filename.len());
-                let block_number = page.get_int(bpos).unwrap();
+                let block_number = page.get_int(bpos)?;
 
                 let opos = bpos + INTGER_BYTES;
-                let offset = page.get_int(opos).unwrap();
+                let offset = page.get_int(opos)?;
 
                 let vpos = opos + INTGER_BYTES;
-                let value = page.get_int(vpos).unwrap();
+                let value = page.get_int(vpos)?;
 
-                LogRecord::create_set_int_record(
+                Ok(LogRecord::create_set_int_record(
                     txnum,
                     offset,
                     value,
                     BlockId {
                         filename,
-                        block_number: block_number,
+                        block_number,
                     },
-                )
+                ))
             }
             LogRecordType::SetString => {
                 let tpos = INTGER_BYTES;
-                let txnum = page.get_int(tpos).unwrap();
+                let txnum = page.get_int(tpos)?;
 
                 let fpos = tpos + INTGER_BYTES;
-                let filename = page.get_string(fpos).unwrap();
+                let filename = page.get_string(fpos)?;
 
                 let bpos = fpos + Page::max_length(filename.len());
-                let block_number = page.get_int(bpos).unwrap();
+                let block_number = page.get_int(bpos)?;
 
                 let opos = bpos + INTGER_BYTES;
-                let offset = page.get_int(opos).unwrap();
+                let offset = page.get_int(opos)?;
 
                 let vpos = opos + INTGER_BYTES;
-                let value = page.get_string(vpos).unwrap();
+                let value = page.get_string(vpos)?;
 
-                LogRecord::create_set_string_record(
+                Ok(LogRecord::create_set_string_record(
                     txnum,
                     offset,
                     value,
                     BlockId {
                         filename,
-                        block_number: block_number,
+                        block_number,
                     },
-                )
+                ))
             }
             _ => {
                 todo!()

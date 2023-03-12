@@ -328,4 +328,24 @@ mod tests {
             _ => panic!("Invalid log record type."),
         }
     }
+
+    fn test_set_int() {
+        let block_id = BlockId {
+            filename: "test.txt".to_string(),
+            block_number: 1,
+        };
+        let record =
+            LogRecord::create_set_int_record(1, 0, 20, block_id.clone());
+        let log_record = LogRecord::try_from(&mut record.into()).unwrap();
+
+        match log_record {
+            LogRecord::SetInt(update_record) => {
+                assert_eq!(update_record.txnum, 1);
+                assert_eq!(update_record.block_id, block_id);
+                assert_eq!(update_record.offset, 0);
+                assert_eq!(update_record.value, 20);
+            }
+            _ => panic!("Invalid log record type."),
+        }
+    }
 }

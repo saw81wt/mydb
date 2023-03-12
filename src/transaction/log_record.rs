@@ -207,7 +207,7 @@ impl TryFrom<&mut Page> for LogRecord {
                 let offset = page.get_int(opos)?;
 
                 let vpos = opos + INTGER_BYTES;
-                let value = page.get_string(vpos)?;
+                let value = page.get_string(vpos).unwrap();
 
                 Ok(LogRecord::create_set_string_record(
                     txnum,
@@ -226,13 +226,13 @@ impl TryFrom<&mut Page> for LogRecord {
     }
 }
 
-impl LogRecord {
-    pub fn write_to_log(&self, log_manager: Arc<Mutex<LogManager>>) -> i32 {
-        match self {
-            Self::CheckPoint(record)
-            | Self::Commit(record)
-            | Self::Start(record)
-            | Self::Rollback(record) => {
+impl From<LogRecord> for Page {
+    fn from(log_record: LogRecord) -> Page {
+        match log_record {
+            LogRecord::CheckPoint(record)
+            | LogRecord::Commit(record)
+            | LogRecord::Start(record)
+            | LogRecord::Rollback(record) => {
                 let tpos = INTGER_BYTES;
                 let record_len = tpos + INTGER_BYTES;
 
@@ -241,14 +241,9 @@ impl LogRecord {
 
                 page.set_int(0, record.record_type.into()).unwrap();
                 page.set_int(tpos, record.txnum).unwrap();
-
-                log_manager
-                    .lock()
-                    .unwrap()
-                    .append_record(&page.contents())
-                    .unwrap()
+                page
             }
-            Self::SetInt(record) => {
+            LogRecord::SetInt(record) => {
                 let tpos = INTGER_BYTES;
                 let fpos = tpos + INTGER_BYTES;
                 let bpos = fpos + Page::max_length(record.block_id.filename.len());
@@ -264,13 +259,9 @@ impl LogRecord {
                     .unwrap();
                 page.set_int(bpos, record.offset).unwrap();
                 page.set_int(vpos, record.value).unwrap();
-                log_manager
-                    .lock()
-                    .unwrap()
-                    .append_record(&page.contents())
-                    .unwrap()
+                page
             }
-            Self::SetString(record) => {
+            LogRecord::SetString(record) => {
                 let tpos = INTGER_BYTES;
                 let fpos = tpos + INTGER_BYTES;
                 let bpos = fpos + Page::max_length(record.block_id.filename.len());
@@ -284,18 +275,17 @@ impl LogRecord {
                 page.set_int(tpos, record.txnum).unwrap();
                 page.set_string(fpos, record.block_id.filename.to_owned())
                     .unwrap();
-                page.set_int(bpos, record.offset).unwrap();
+                page.set_int(bpos, record.block_id.block_number).unwrap();
+                page.set_int(opos, record.offset).unwrap();
                 page.set_string(vpos, record.value.to_owned()).unwrap();
-                log_manager
-                    .lock()
-                    .unwrap()
-                    .append_record(&page.contents())
-                    .unwrap()
+                page
             }
-            _ => 0,
+            _ => todo!(),
         }
     }
+}
 
+impl LogRecord {
     pub fn undo(&self, transaction: &Transaction) {
         match self {
             Self::CheckPoint(record)
@@ -313,3 +303,29 @@ impl LogRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_string() {
+        let block_id = BlockId {
+            filename: "test.txt".to_string(),
+            block_number: 1,
+        };
+        let record = LogRecord::create_set_string_record(1, 0, "test".to_string(), block_id.clone());
+        let log_record = LogRecord::try_from(&mut record.into()).unwrap();
+
+        match log_record {
+            LogRecord::SetString(update_record) => {
+                assert_eq!(update_record.txnum, 1);
+                assert_eq!(update_record.block_id, block_id);
+                assert_eq!(update_record.offset, 0);
+                assert_eq!(update_record.value, "test".to_string());
+            }
+            _ => panic!("Invalid log record type."),
+        }
+    }
+}
+

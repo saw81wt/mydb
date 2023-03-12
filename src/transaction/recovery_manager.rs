@@ -26,7 +26,8 @@ impl RecoveryManager {
         txnum: i32,
     ) -> Self {
         let record = LogRecord::create_start_record(txnum);
-        record.write_to_log(Arc::clone(&log_manager));
+        let mut page: Page = record.into();
+        log_manager.lock().unwrap().append_record(page.contents()).unwrap();
         Self {
             log_manager,
             buffer_manager,
@@ -38,7 +39,8 @@ impl RecoveryManager {
     pub fn commit(&self) {
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_commit_record(self.txnum);
-        let lsm = record.write_to_log(Arc::clone(&self.log_manager));
+        let mut page: Page = record.into();
+        let lsm = self.log_manager.lock().unwrap().append_record(page.contents()).unwrap();
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
@@ -46,7 +48,8 @@ impl RecoveryManager {
         self.do_rollback(transaction);
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_rollback_record(self.txnum);
-        let lsm = record.write_to_log(Arc::clone(&self.log_manager));
+        let mut page: Page = record.into();
+        let lsm = self.log_manager.lock().unwrap().append_record(page.contents()).unwrap();
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
@@ -54,7 +57,8 @@ impl RecoveryManager {
         self.do_recevery(transaction);
         self.buffer_manager.lock().unwrap().flush_all(self.txnum);
         let record = LogRecord::create_checkpoint_record(self.txnum);
-        let lsm = record.write_to_log(Arc::clone(&self.log_manager));
+        let mut page: Page = record.into();
+        let lsm = self.log_manager.lock().unwrap().append_record(page.contents()).unwrap();
         self.log_manager.lock().unwrap().flush_with(lsm).unwrap();
     }
 
@@ -64,7 +68,8 @@ impl RecoveryManager {
         let block_id = (*locked_buffer.block_id()).as_ref().unwrap();
         let record =
             LogRecord::create_set_int_record(self.txnum, offset, old_value, block_id.clone());
-        record.write_to_log(Arc::clone(&self.log_manager))
+        let mut page: Page = record.into();
+        self.log_manager.lock().unwrap().append_record(page.contents()).unwrap()
     }
 
     pub fn set_string(&self, buf: Arc<RwLock<Buffer>>, offset: i32) -> i32 {
@@ -73,14 +78,15 @@ impl RecoveryManager {
         let block_id = (*locked_buffer.block_id()).as_ref().unwrap();
         let record =
             LogRecord::create_set_string_record(self.txnum, offset, old_value, block_id.clone());
-        record.write_to_log(Arc::clone(&self.log_manager))
+        let mut page: Page = record.into();
+        self.log_manager.lock().unwrap().append_record(page.contents()).unwrap()
     }
 
     fn do_rollback(&self, transaction: &Transaction) {
         let iter = self.log_manager.lock().unwrap().iterator().unwrap();
         for record in iter {
             let mut page = Page::from(record);
-            let log_record = LogRecord::from(&mut page);
+            let log_record = LogRecord::try_from(&mut page).unwrap();
             if log_record.get_txnum() == self.txnum {
                 match log_record {
                     LogRecord::Start(_) => return,
@@ -97,7 +103,7 @@ impl RecoveryManager {
         let iter = self.log_manager.lock().unwrap().iterator().unwrap();
         for record in iter {
             let mut page = Page::from(record);
-            let log_record = LogRecord::from(&mut page);
+            let log_record = LogRecord::try_from(&mut page).unwrap();
             let txnum = log_record.get_txnum();
             match log_record {
                 LogRecord::CheckPoint(_) => return,

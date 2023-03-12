@@ -15,6 +15,7 @@ pub struct BlockId {
     pub block_number: i32,
 }
 
+#[derive(Debug)]
 pub struct Page {
     cursor: Cursor<Vec<u8>>,
 }

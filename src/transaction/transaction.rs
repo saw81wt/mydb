@@ -173,7 +173,7 @@ mod tests {
         let filename = tempfile.path().file_name().unwrap().to_str().unwrap();
         let file_manager = Arc::new(Mutex::new(FileManager::new(directory.to_string())));
 
-        let mut buffer_manager = Arc::new(Mutex::new(BufferManager::new(file_manager.clone(), log_manager.clone(), 3)));
+        let buffer_manager = Arc::new(Mutex::new(BufferManager::new(file_manager.clone(), log_manager.clone(), 3)));
 
         let lock_table = Arc::new(Mutex::new(LockTable::new()));
 
@@ -206,8 +206,8 @@ mod tests {
 
         let new_ival = ival + 1;
         let new_sval = sval + "!";
-        tx2.set_int(&block, 80, 1, false);
-        tx2.set_string(&block, 40, "two".to_string(), false);
+        tx2.set_int(&block, 80, new_ival, false);
+        tx2.set_string(&block, 40, new_sval.to_string(), false);
         tx2.commit();
 
         let mut tx3 = Transaction::new(
@@ -217,7 +217,7 @@ mod tests {
             Arc::clone(&lock_table),
         );
         tx3.pin(&block);
-        tx3.set_int(&block, 80, 9999, true);
+        tx3.set_int(&block, 80, 9999, false);
         tx3.rollback();
 
         let mut tx4 = Transaction::new(

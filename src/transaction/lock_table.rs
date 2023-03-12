@@ -6,7 +6,6 @@ use crate::{error::LockAbortError, file_manager::BlockId};
 
 const MAX_TIME: Duration = Duration::from_secs(10);
 
-
 pub struct LockTable {
     table: RwLock<HashMap<BlockId, i32>>,
 }
@@ -85,16 +84,16 @@ pub struct ConcurrentManager {
 }
 
 impl ConcurrentManager {
-        pub fn new(lock_table: Arc<LockTable>) -> Self {
-            let table = HashMap::new();
-            Self { lock_table, table }
-        }
+    pub fn new(lock_table: Arc<LockTable>) -> Self {
+        let table = HashMap::new();
+        Self { lock_table, table }
+    }
 
-        pub fn slock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
-            if self.table.get(block_id) != None {
-                self.lock_table.slock(block_id)?;
-                self.table.insert(block_id.clone(), "S".to_string());
-            }
+    pub fn slock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
+        if self.table.get(block_id) != None {
+            self.lock_table.slock(block_id)?;
+            self.table.insert(block_id.clone(), "S".to_string());
+        }
         Ok(())
     }
 

@@ -20,7 +20,7 @@ impl Default for LockTable {
 }
 
 impl LockTable {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
@@ -81,21 +81,20 @@ impl LockTable {
 
 pub struct ConcurrentManager {
     lock_table: Arc<LockTable>,
-    table: Arc<Mutex<HashMap<BlockId, String>>>,
+    table: HashMap<BlockId, String>,
 }
 
 impl ConcurrentManager {
-    pub fn new(lock_table: Arc<LockTable>) -> Self {
-        let table = Arc::new(Mutex::new(HashMap::new()));
-        Self { lock_table, table }
-    }
-
-    pub fn slock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
-        let mut locked_table = self.table.lock().unwrap();
-        if locked_table.get(block_id) != None {
-            self.lock_table.slock(block_id)?;
-            locked_table.insert(block_id.clone(), "S".to_string());
+        pub fn new(lock_table: Arc<LockTable>) -> Self {
+            let table = HashMap::new();
+            Self { lock_table, table }
         }
+
+        pub fn slock(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
+            if self.table.get(block_id) != None {
+                self.lock_table.slock(block_id)?;
+                self.table.insert(block_id.clone(), "S".to_string());
+            }
         Ok(())
     }
 
@@ -104,23 +103,20 @@ impl ConcurrentManager {
             self.slock(block_id)?;
             self.lock_table.xlock(block_id)?;
 
-            let mut locked_table = self.table.lock().unwrap();
-            locked_table.insert(block_id.clone(), "X".to_string());
+            self.table.insert(block_id.clone(), "X".to_string());
         }
         Ok(())
     }
 
     pub fn release(&mut self) {
-        let mut locked_table = self.table.lock().unwrap();
-        for block_id in locked_table.keys() {
+        for block_id in self.table.keys() {
             self.lock_table.unlock(block_id);
         }
-        locked_table.clear();
+        self.table.clear();
     }
 
     fn has_lock(&self, block_id: &BlockId) -> bool {
-        let locked_table = self.table.lock().unwrap();
-        match locked_table.get(block_id) {
+        match self.table.get(block_id) {
             Some(v) => v == "X",
             None => false,
         }

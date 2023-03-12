@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use std::collections::hash_map::Entry;
-use std::fs::{File, OpenOptions};
+use std::fs::{metadata, File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ pub const INTGER_BYTES: usize = 4;
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct BlockId {
     pub filename: String,
-    pub block_number: usize,
+    pub block_number: i32,
 }
 
 pub struct Page {
@@ -97,7 +97,7 @@ impl FileManager {
     }
 
     pub fn write(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
-        let block_size = self.block_size;
+        let block_size = self.block_size as i32;
         let mut file = self.get_file(&block_id.filename)?;
         file.seek(SeekFrom::Start((block_id.block_number * block_size) as u64))?;
         file.write_all(page.contents())?;
@@ -105,7 +105,7 @@ impl FileManager {
     }
 
     pub fn read(&mut self, block_id: &BlockId, page: &mut Page) -> io::Result<()> {
-        let block_size = self.block_size;
+        let block_size = self.block_size as i32;
         let mut file = self.get_file(&block_id.filename)?;
         file.seek(SeekFrom::Start((block_id.block_number * block_size) as u64))?;
         file.read_to_end(page.contents())?;
@@ -127,13 +127,19 @@ impl FileManager {
         Ok(file)
     }
 
+    pub fn length(&mut self, filename: &String) -> anyhow::Result<i32> {
+        let _ = self.get_file(filename)?;
+        let s = metadata(filename).unwrap();
+        return Ok((s.len() / (self.block_size as u64)) as i32);
+    }
+
     pub fn append_new_block(&mut self, filename: &String) -> io::Result<BlockId> {
         let block_size = self.block_size;
 
         let new_block_num = self.last_block_num(filename)?;
         let new_block = BlockId {
             filename: filename.to_string(),
-            block_number: new_block_num,
+            block_number: new_block_num as i32,
         };
         let buf: Vec<u8> = Vec::with_capacity(block_size);
 

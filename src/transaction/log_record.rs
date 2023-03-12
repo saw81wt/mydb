@@ -188,7 +188,7 @@ impl From<&mut Page> for LogRecord {
                     value,
                     BlockId {
                         filename,
-                        block_number: block_number as usize,
+                        block_number: block_number,
                     },
                 )
             }
@@ -214,7 +214,7 @@ impl From<&mut Page> for LogRecord {
                     value,
                     BlockId {
                         filename,
-                        block_number: block_number as usize,
+                        block_number: block_number,
                     },
                 )
             }

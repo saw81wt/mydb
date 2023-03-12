@@ -1,6 +1,5 @@
 use std::{
-    ops::{Deref, DerefMut},
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex, RwLock}, ops::{Deref, DerefMut},
 };
 use thiserror::Error;
 
@@ -50,10 +49,6 @@ impl Buffer {
         }
     }
 
-    pub fn contents(&self) -> &Page {
-        &self.contents
-    }
-
     pub fn block_id(&self) -> &Option<BlockId> {
         &self.block_id
     }
@@ -93,7 +88,7 @@ impl Buffer {
 pub struct BufferManager {
     file_manager: Arc<Mutex<FileManager>>,
     log_manager: Arc<Mutex<LogManager>>,
-    buffer_pool: Mutex<Vec<Arc<RwLock<Buffer>>>>,
+    buffer_pool: Vec<Arc<RwLock<Buffer>>>,
     num_available: i32,
 }
 
@@ -107,11 +102,9 @@ impl BufferManager {
         BufferManager {
             file_manager: Arc::clone(&file_manager),
             log_manager: Arc::clone(&log_manager),
-            buffer_pool: Mutex::new(
-                (0..num_buffers)
-                    .map(|_| Arc::new(RwLock::new(Buffer::new(block_size))))
-                    .collect(),
-            ),
+            buffer_pool: (0..num_buffers)
+                .map(|_| Arc::new(RwLock::new(Buffer::new(block_size))))
+                .collect(),
             num_available: num_buffers,
         }
     }
@@ -121,8 +114,7 @@ impl BufferManager {
     }
 
     pub fn flush_all(&mut self, txnum: i32) {
-        let locked_pool = self.buffer_pool.lock().unwrap();
-        for buffer in locked_pool.iter() {
+        for buffer in self.buffer_pool.iter() {
             let mut buffer = buffer.write().unwrap();
             if buffer.modifying_tx() == txnum {
                 if buffer.txnum >= 0 {
@@ -134,7 +126,7 @@ impl BufferManager {
                     self.file_manager
                         .lock()
                         .unwrap()
-                        .write(&buffer.block_id.clone().unwrap(), &mut buffer.contents)
+                        .write(&buffer.block_id.clone().unwrap(), &mut buffer)
                         .unwrap();
                     buffer.txnum -= 1;
                 }
@@ -185,8 +177,7 @@ impl BufferManager {
     }
 
     fn find_existing_buffer(&self, target_block_id: &BlockId) -> Option<Arc<RwLock<Buffer>>> {
-        let locked_pool = self.buffer_pool.lock().unwrap();
-        locked_pool
+        self.buffer_pool
             .iter()
             .find(|buffer| {
                 if let Some(block_id) = buffer.write().unwrap().block_id.clone() {
@@ -200,8 +191,6 @@ impl BufferManager {
 
     fn choose_unpinned_buffer(&self) -> Option<Arc<RwLock<Buffer>>> {
         self.buffer_pool
-            .lock()
-            .unwrap()
             .iter()
             .find(|buffer| !buffer.write().unwrap().is_pinned())
             .and_then(|v| Some(v.clone()))
@@ -213,6 +202,21 @@ mod tests {
     use super::*;
     use tempfile::Builder;
 
+    fn create_block_id(i: i32) -> BlockId {
+        let directory = "./data";
+        let tempfile = Builder::new().tempfile_in(directory.to_string()).unwrap();
+        BlockId {
+            filename: tempfile
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            block_number: i,
+        }
+    }
+
     #[test]
     fn buffer_manager() {
         let directory = "./data";
@@ -223,30 +227,17 @@ mod tests {
             LogManager::new(log_file_manager, log_filename.to_string()).unwrap(),
         ));
 
-        let tempfile = Builder::new().tempfile_in(directory.to_string()).unwrap();
-        let filename = tempfile.path().file_name().unwrap().to_str().unwrap();
         let file_manager = Arc::new(Mutex::new(FileManager::new(directory.to_string())));
-
         let mut buffer_manager =
             BufferManager::new(Arc::clone(&file_manager), Arc::clone(&log_manager), 3);
 
         let mut buffer: Vec<Arc<RwLock<Buffer>>> = Vec::with_capacity(6);
-        let block_id_0 = BlockId {
-            filename: filename.to_string(),
-            block_number: 0,
-        };
-        let block_id_1 = BlockId {
-            filename: filename.to_string(),
-            block_number: 1,
-        };
-        let block_id_2 = BlockId {
-            filename: filename.to_string(),
-            block_number: 2,
-        };
-        let block_id_3 = BlockId {
-            filename: filename.to_string(),
-            block_number: 3,
-        };
+        let block_id_0 = create_block_id(0);
+        let block_id_1 = create_block_id(1);
+        let block_id_2 = create_block_id(2);
+        let block_id_3 = create_block_id(3);
+
+        assert!(buffer_manager.pin(&block_id_0).is_ok());
 
         buffer.insert(0, buffer_manager.pin(&block_id_0).unwrap());
         buffer.insert(1, buffer_manager.pin(&block_id_1).unwrap());

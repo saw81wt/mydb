@@ -3,7 +3,7 @@ use crate::file_manager::BlockId;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
-struct BufferList {
+pub struct BufferList {
     buffers: HashMap<BlockId, Arc<RwLock<Buffer>>>,
     pins: HashMap<BlockId, i32>,
     buffer_manager: Arc<Mutex<BufferManager>>,
@@ -24,7 +24,7 @@ impl BufferList {
         return self.buffers.get(block_id);
     }
 
-    fn pin(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
+    pub fn pin(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
         let mut locked_buffer_manager = self.buffer_manager.lock().unwrap();
         let buffer = locked_buffer_manager.pin(block_id)?;
         self.buffers.insert(block_id.clone(), Arc::clone(&buffer));
@@ -36,7 +36,7 @@ impl BufferList {
         Ok(())
     }
 
-    fn unpin(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
+    pub fn unpin(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
         let buffer = self.buffers.get(block_id).unwrap();
 
         let mut locked_buffer_manager = self.buffer_manager.lock().unwrap();
@@ -57,7 +57,7 @@ impl BufferList {
         Ok(())
     }
 
-    fn unpin_all(&mut self) -> anyhow::Result<()> {
+    pub fn unpin_all(&mut self) -> anyhow::Result<()> {
         for block in self.pins.keys() {
             match self.buffers.get(block) {
                 Some(buffer) => {

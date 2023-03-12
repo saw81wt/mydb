@@ -11,7 +11,7 @@ use super::{
     transaction::{self, Transaction},
 };
 
-struct RecoveryManager {
+pub struct RecoveryManager {
     log_manager: Arc<Mutex<LogManager>>,
     buffer_manager: Arc<Mutex<BufferManager>>,
     //transaction: Transaction,

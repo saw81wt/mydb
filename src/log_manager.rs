@@ -1,4 +1,7 @@
-use std::{sync::{Arc, Mutex}, io};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+};
 
 use crate::file_manager::{BlockId, FileManager, Page, INTGER_BYTES};
 
@@ -24,7 +27,7 @@ impl LogManager {
         } else {
             BlockId {
                 filename: log_file.clone(),
-                block_number: (log_size - 1) as usize,
+                block_number: (log_size - 1) as i32,
             }
         };
         Ok(LogManager {
@@ -44,12 +47,12 @@ impl LogManager {
         Ok(())
     }
 
-    fn iterator(&mut self) -> io::Result<LogIterator> {
+    pub fn iterator(&mut self) -> io::Result<LogIterator> {
         self.flush().unwrap();
         LogIterator::new(self.file_manager.clone(), self.current_block.clone())
     }
 
-    fn append_record(&mut self, log_record: &[u8]) -> io::Result<i32> {
+    pub fn append_record(&mut self, log_record: &[u8]) -> io::Result<i32> {
         //
         let mut boundary = self.get_boundary();
         let record_size = log_record.len();

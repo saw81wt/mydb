@@ -132,10 +132,10 @@ pub struct TransactionRecord {
 
 pub struct UpdateRecord<T> {
     record_type: LogRecordType,
-    txnum: i32,
-    offset: i32,
-    value: T,
-    block_id: BlockId,
+    pub txnum: i32,
+    pub offset: i32,
+    pub value: T,
+    pub block_id: BlockId,
 }
 
 impl TryFrom<&mut Page> for LogRecord {
@@ -281,25 +281,6 @@ impl From<LogRecord> for Page {
                 page
             }
             _ => todo!(),
-        }
-    }
-}
-
-impl LogRecord {
-    pub fn undo(&self, transaction: &Transaction) {
-        match self {
-            Self::CheckPoint(record)
-            | Self::Commit(record)
-            | Self::Start(record)
-            | Self::Rollback(record) => {
-                todo!()
-            }
-            Self::SetInt(record) => {
-                todo!()
-            }
-            Self::SetString(_) => {
-                todo!()
-            }
         }
     }
 }

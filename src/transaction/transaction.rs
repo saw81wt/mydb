@@ -1,14 +1,15 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use anyhow::Context;
+use anyhow::{Context, Ok};
 
 use crate::buffer_manager::BufferManager;
-use crate::file_manager::{BlockId, FileManager};
+use crate::file_manager::{BlockId, FileManager, Page};
 use crate::log_manager::LogManager;
 
 use super::buffer_list::BufferList;
 use super::lock_table::{ConcurrentManager, LockTable};
+use super::log_record::{LogRecord, LogRecordTrait};
 use super::recovery_manager::RecoveryManager;
 
 static TXMUN: AtomicUsize = AtomicUsize::new(0);
@@ -56,16 +57,46 @@ impl Transaction {
     }
 
     pub fn rollback(&mut self) -> anyhow::Result<()> {
-        self.recovery_manager.rollback(self);
+        let iter = self.log_manager.lock().unwrap().iterator().unwrap();
+
+        for record in iter {
+            let mut page = Page::from(record);
+            let log_record = LogRecord::try_from(&mut page).unwrap();
+            if log_record.get_txnum() == self.txnum as i32 {
+                match log_record {
+                    LogRecord::Start(_) => return Ok(()),
+                    _ => {}
+                }
+                self.undo(log_record);
+            }
+        }
+        self.recovery_manager.rollback();
         self.concurrent_manager.release();
         self.buffer_list.unpin_all()?;
         Ok(())
     }
 
-    pub fn recover(&self) {
-        let mut locked_buffer_manager = self.buffer_manager.lock().unwrap();
-        locked_buffer_manager.flush_all(self.txnum as i32);
-        self.recovery_manager.recover(self);
+    pub fn recover(&mut self) {
+        {
+            let mut locked_buffer_manager = self.buffer_manager.lock().unwrap();
+            locked_buffer_manager.flush_all(self.txnum as i32);
+        }
+
+        let mut finished_transactions: Vec<i32> = vec![];
+        let iter = self.log_manager.lock().unwrap().iterator().unwrap();
+        for record in iter {
+            let mut page = Page::from(record);
+            let log_record = LogRecord::try_from(&mut page).unwrap();
+            let txnum = log_record.get_txnum();
+            match log_record {
+                LogRecord::CheckPoint(_) => return,
+                LogRecord::Commit(_) | LogRecord::Rollback(_) => finished_transactions.push(txnum),
+                _ => {}
+            }
+            if !finished_transactions.contains(&txnum) {
+                self.undo(log_record);
+            }
+        }
     }
 
     pub fn pin(&mut self, block_id: &BlockId) -> anyhow::Result<()> {
@@ -150,6 +181,27 @@ impl Transaction {
         self.concurrent_manager.slock(&dummy)?;
         let mut locked_fm = self.file_manager.lock().unwrap();
         locked_fm.length(&filename)
+    }
+
+    pub fn undo(&mut self, log_record: LogRecord) {
+        match log_record {
+            LogRecord::CheckPoint(record)
+            | LogRecord::Commit(record)
+            | LogRecord::Start(record)
+            | LogRecord::Rollback(record) => {
+                todo!()
+            }
+            LogRecord::SetInt(record) => {
+                self.pin(&record.block_id);
+                self.set_int(&record.block_id, record.offset, record.value, false);
+                self.unpin(&record.block_id);
+            }
+            LogRecord::SetString(record) => {
+                self.pin(&record.block_id);
+                self.set_string(&record.block_id, record.offset, record.value, false);
+                self.unpin(&record.block_id);
+            }
+        }
     }
 }
 

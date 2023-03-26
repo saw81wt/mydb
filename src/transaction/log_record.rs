@@ -1,7 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    file_manager::file_manager::{BlockId, Page, INTGER_BYTES},
+    file_manager::{
+        file_manager::{BlockId, INTGER_BYTES},
+        page::Page,
+    },
     log_manager::LogManager,
 };
 

@@ -5,7 +5,10 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    file_manager::file_manager::{BlockId, FileManager, Page},
+    file_manager::{
+        file_manager::{BlockId, FileManager},
+        page::Page,
+    },
     log_manager::LogManager,
 };
 

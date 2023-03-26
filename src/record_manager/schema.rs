@@ -1,6 +1,6 @@
 use linked_hash_map::LinkedHashMap;
 
-use crate::file_manager::{Page, INTGER_BYTES};
+use crate::file_manager::{file_manager::INTGER_BYTES, page::Page};
 
 #[derive(Debug)]
 pub struct Schema {

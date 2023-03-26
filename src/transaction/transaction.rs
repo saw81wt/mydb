@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex};
 use anyhow::{Context, Ok, Result};
 
 use crate::buffer_manager::BufferManager;
-use crate::file_manager::file_manager::{BlockId, FileManager, Page};
+use crate::file_manager::file_manager::{BlockId, FileManager};
+use crate::file_manager::page::Page;
 use crate::log_manager::LogManager;
 
 use super::buffer_list::BufferList;

@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use crate::{
     buffer_manager::{Buffer, BufferManager},
-    file_manager::file_manager::Page,
+    file_manager::page::Page,
     log_manager::LogManager,
 };
 

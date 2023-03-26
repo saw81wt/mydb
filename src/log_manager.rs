@@ -3,7 +3,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::file_manager::file_manager::{BlockId, FileManager, Page, INTGER_BYTES};
+use crate::file_manager::{
+    file_manager::{BlockId, FileManager, INTGER_BYTES},
+    page::Page,
+};
 
 pub struct LogManager {
     file_manager: Arc<Mutex<FileManager>>,

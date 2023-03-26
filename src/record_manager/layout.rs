@@ -1,6 +1,5 @@
+use crate::file_manager::file_manager::INTGER_BYTES;
 use std::collections::HashMap;
-
-use crate::file_manager::INTGER_BYTES;
 
 use super::schema::Schema;
 

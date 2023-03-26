@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::file_manager::INTGER_BYTES;
+
 use super::schema::Schema;
 
 #[derive(Debug)]
@@ -26,7 +28,8 @@ impl Layout {
 impl From<Schema> for Layout {
     fn from(schema: Schema) -> Self {
         let mut offsets = HashMap::new();
-        let mut offset = 0;
+        // space for the empty/inuse flag
+        let mut offset = INTGER_BYTES;
         for (field_name, field_info) in &schema.field_info {
             offsets.insert(field_name.clone(), offset);
             offset += field_info.bytes_length();
@@ -65,8 +68,8 @@ mod tests {
 
         let layout = Layout::from(schema);
 
-        assert_eq!(layout.get_offset("id"), 0);
-        assert_eq!(layout.get_offset("name"), 4);
-        assert_eq!(layout.get_offset("age"), 18);
+        assert_eq!(layout.get_offset("id"), 4);
+        assert_eq!(layout.get_offset("name"), 8);
+        assert_eq!(layout.get_offset("age"), 22);
     }
 }

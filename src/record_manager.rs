@@ -1,3 +1,3 @@
 mod layout;
-pub mod record_manager;
+mod record_page;
 mod schema;

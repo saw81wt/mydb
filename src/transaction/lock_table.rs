@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-use crate::{error::LockAbortError, file_manager::BlockId};
+use crate::file_manager::file_manager::BlockId;
+use crate::{error::LockAbortError};
 
 const MAX_TIME: Duration = Duration::from_secs(10);
 

@@ -5,8 +5,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    file_manager::{BlockId, FileManager, Page},
-    log_manager::LogManager,
+    log_manager::LogManager, file_manager::file_manager::{Page, BlockId, FileManager},
 };
 
 pub const MAX_TIME: i32 = 10000;

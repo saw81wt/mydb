@@ -1,11 +1,11 @@
 use crate::{
     buffer_manager::BufferManager,
-    file_manager::FileManager,
     log_manager::LogManager,
     transaction::{
         lock_table::{self, LockTable},
         transaction::Transaction,
     },
+    file_manager::file_manager::FileManager,
 };
 use std::sync::{Arc, Mutex};
 

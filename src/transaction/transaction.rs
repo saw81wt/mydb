@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{Context, Ok, Result};
 
 use crate::buffer_manager::BufferManager;
-use crate::file_manager::file_manager::{Page, BlockId, FileManager};
+use crate::file_manager::file_manager::{BlockId, FileManager, Page};
 use crate::log_manager::LogManager;
 
 use super::buffer_list::BufferList;
@@ -190,7 +190,9 @@ impl Transaction {
         };
         self.concurrent_manager.xlock(&dummy);
         let mut locked_filemanager = self.file_manager.lock().unwrap();
-        locked_filemanager.append_new_block(&filename).context("append new block")
+        locked_filemanager
+            .append_new_block(&filename)
+            .context("append new block")
     }
 
     pub fn undo(&mut self, log_record: LogRecord) {

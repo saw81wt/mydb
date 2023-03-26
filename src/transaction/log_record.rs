@@ -1,7 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    log_manager::LogManager, file_manager::file_manager::{BlockId, Page, INTGER_BYTES},
+    file_manager::file_manager::{BlockId, Page, INTGER_BYTES},
+    log_manager::LogManager,
 };
 
 use super::transaction::Transaction;

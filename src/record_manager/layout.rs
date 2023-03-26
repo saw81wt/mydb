@@ -53,9 +53,9 @@ mod tests {
 
         let layout = Layout::from(schema);
 
-        assert_eq!(layout.slot_size, 18);
-        assert_eq!(layout.offsets.get("id").unwrap(), &0);
-        assert_eq!(layout.offsets.get("name").unwrap(), &4);
+        assert_eq!(layout.slot_size, 22);
+        assert_eq!(layout.get_offset("id"), 4);
+        assert_eq!(layout.get_offset("name"), 8);
     }
 
     #[test]

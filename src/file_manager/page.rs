@@ -17,7 +17,7 @@ impl Page {
     pub fn get_int(&mut self, offset: usize) -> io::Result<i32> {
         self.cursor.seek(SeekFrom::Start(offset as u64))?;
         let ret: &mut [u8; INTGER_BYTES] = &mut [0; INTGER_BYTES];
-        self.cursor.read_exact(ret)?;
+        self.cursor.read(ret)?;
         Ok(i32::from_be_bytes(*ret))
     }
 
@@ -32,6 +32,7 @@ impl Page {
         let length = self.get_int(offset)?;
         let mut data = vec![0; length as usize].into_boxed_slice();
         let read_length = self.cursor.read(data.as_mut())?;
+        log::debug!("expect_length: {}", length);
         log::debug!("read_length: {}", read_length);
         Ok(data)
     }

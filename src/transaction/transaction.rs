@@ -280,7 +280,7 @@ mod tests {
         let new_ival = ival + 1;
         let new_sval = sval + "!";
         tx2.set_int(&block, 80, new_ival, false);
-        tx2.set_string(&block, 40, new_sval.to_string(), false);
+        tx2.set_string(&block, 40, new_sval.to_string(), true);
         tx2.commit();
 
         let mut tx3 = Transaction::new(

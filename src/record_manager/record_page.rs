@@ -89,13 +89,15 @@ impl RecordPage {
 mod tests {
     use crate::{
         mydb::MyDb,
-        record_manager::{record_page, schema::Schema},
+        record_manager::schema::Schema,
     };
 
     use super::*;
 
     #[test]
     fn test_record_page() {
+        // init log
+   
         let mydb = MyDb::new("test".to_string(), 1000, 8);
         let mut transaction = mydb.new_transaction();
 
@@ -104,17 +106,21 @@ mod tests {
         schema.add_string_field("name".to_string(), 10);
         schema.add_int_field("age".to_string());
 
-        let layout = Layout::from(schema);
+        let layout = Layout::from(schema);                                  
         let new_block_id = transaction.append("test".to_string()).unwrap();
-        transaction.pin(&new_block_id);
+        transaction.pin(&new_block_id).unwrap();
         let mut record_page = RecordPage::new(layout, transaction, new_block_id);
 
         let slot_id = record_page.intert_after(0).unwrap();
-        record_page.set_int(slot_id, "id".to_string(), 1);
-        record_page.set_string(slot_id, "name".to_string(), "John".to_string());
-        record_page.set_int(slot_id, "age".to_string(), 23);
+        record_page.set_int(slot_id, "id".to_string(), 1).unwrap();
+        record_page.set_string(slot_id, "name".to_string(), "John".to_string()).unwrap();
+        record_page.set_int(slot_id, "age".to_string(), 23).unwrap();
 
         let id = record_page.get_int(slot_id, "id".to_string()).unwrap();
+        let name = record_page.get_string(slot_id, "name".to_string()).unwrap();
+        let age = record_page.get_int(slot_id, "age".to_string()).unwrap();
         assert_eq!(id, 1);
+        assert_eq!(name, "John");
+        assert_eq!(age, 23);
     }
 }

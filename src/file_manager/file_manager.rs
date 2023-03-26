@@ -6,6 +6,8 @@ use std::fs::{metadata, File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::rc::Rc;
 
+use log::trace;
+
 pub const PAGE_SIZE: usize = 4096;
 pub const INTGER_BYTES: usize = 4;
 
@@ -54,7 +56,7 @@ impl Page {
         let length = self.get_int(offset)?;
         let mut data = vec![0; length as usize].into_boxed_slice();
         let read_length = self.cursor.read(data.as_mut())?;
-        log::info!("read_length: {}", read_length);
+        log::debug!("read_length: {}", read_length);
         Ok(data)
     }
 
@@ -173,8 +175,10 @@ mod tests {
 
     #[test]
     fn disk() {
-        // init logger
-        let _ = env_logger::builder().is_test(true).try_init();
+        // init logger for debug
+        let _ = env_logger::builder()
+            .filter_level(log::LevelFilter::Debug)
+            .is_test(true).try_init();
 
         let directory = "./data";
         let tempfile = Builder::new().tempfile_in(directory).unwrap();

@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Context, Ok};
+use anyhow::{Context, Ok, Result};
 
 use crate::buffer_manager::BufferManager;
 use crate::file_manager::{BlockId, FileManager, Page};
@@ -183,6 +183,16 @@ impl Transaction {
         locked_fm.length(&filename)
     }
 
+    pub fn append(&mut self, filename: String) -> Result<BlockId> {
+        let dummy = BlockId {
+            filename: filename.clone(),
+            block_number: -1,
+        };
+        self.concurrent_manager.xlock(&dummy);
+        let mut locked_filemanager = self.file_manager.lock().unwrap();
+        locked_filemanager.append_new_block(&filename).context("append new block")
+    }
+
     pub fn undo(&mut self, log_record: LogRecord) {
         match log_record {
             LogRecord::CheckPoint(record)
@@ -202,6 +212,10 @@ impl Transaction {
                 self.unpin(&record.block_id);
             }
         }
+    }
+
+    pub fn block_size(&self) -> usize {
+        self.file_manager.lock().unwrap().block_size
     }
 }
 

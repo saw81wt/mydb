@@ -1,17 +1,17 @@
-use std::collections::HashMap;
+use linked_hash_map::LinkedHashMap;
 
 use crate::file_manager::{Page, INTGER_BYTES};
 
 #[derive(Debug)]
 pub struct Schema {
     pub fields: Vec<String>,
-    pub field_info: HashMap<String, FieldInfo>,
+    pub field_info: LinkedHashMap<String, FieldInfo>,
 }
 
 impl Schema {
     pub fn new() -> Self {
         let fields = vec![];
-        let field_info = HashMap::new();
+        let field_info = LinkedHashMap::new();
         Self { fields, field_info }
     }
 
